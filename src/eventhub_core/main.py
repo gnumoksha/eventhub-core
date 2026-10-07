@@ -1,12 +1,12 @@
 from typing import Any
 
-import access_control.domain
-import analytics.domain
-import events.domain
-import identity.domain
-import notifications.domain
-import orders.domain
-import payments.domain
+import access_control.application
+import analytics.application
+import events.application
+import identity.application
+import notifications.application
+import orders.application
+import payments.application
 from access_control.infra.http.routers.setup import setup_routers as access_control_setup_routers
 from analytics.infra.http.routers.setup import setup_routers as analytics_setup_routers
 from events.infra.http.routers.setup import setup_routers as events_setup_routers
@@ -101,22 +101,22 @@ def app_status(
 
 
 access_control_setup_routers(app)
-load_listeners(access_control.domain)
+load_listeners(access_control.application)
 
 analytics_setup_routers(app)
-load_listeners(analytics.domain)
+load_listeners(analytics.application)
 
 payments_setup_routers(app)
-load_listeners(payments.domain)
+load_listeners(payments.application)
 
 events_setup_routers(app)
-load_listeners(events.domain)
+load_listeners(events.application)
 
 identity_setup_routers(app)
-load_listeners(identity.domain)
+load_listeners(identity.application)
 
 notifications_setup_routers(app)
-load_listeners(notifications.domain)
+load_listeners(notifications.application)
 
 orders_setup_routers(app)
-load_listeners(orders.domain)
+load_listeners(orders.application)

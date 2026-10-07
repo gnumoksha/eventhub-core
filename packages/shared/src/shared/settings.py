@@ -7,7 +7,7 @@ import os
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import SecretStr
+from pydantic import HttpUrl, PostgresDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from shared.infra.di import Depends
@@ -43,9 +43,9 @@ class Settings(BaseSettings):
     LOGGING_LEVEL: str = "INFO"
     PUBLIC_URL: str
 
-    DATABASE_URL: str
+    DATABASE_URL: PostgresDsn
 
-    SENTRY_DSN: str
+    SENTRY_DSN: HttpUrl | None = None
     CORS_ALLOWED_ORIGINS: str
     CORS_ALLOW_ORIGIN_REGEX: str | None = None
 

@@ -1,3 +1,3 @@
-from typing import NewType
+import uuid
 
-UserId = NewType("UserId", int)
+UserID = uuid.UUID

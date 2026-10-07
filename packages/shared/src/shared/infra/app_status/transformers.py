@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from fastapi import Request
-
 from shared.infra.app_status.inputs import ShowAppStatusInput
 from shared.infra.di import Depends
 
