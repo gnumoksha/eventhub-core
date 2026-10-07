@@ -1,0 +1,106 @@
+services:
+  app-web:
+    image: eventhub/core-web:latest
+    build:
+      context: .
+      dockerfile: ./var/docker/Dockerfile
+      target: production
+      ssh:
+        - default
+    ports:
+      # Default to the classic port for a plain `docker compose up`. Override per
+      # worktree (e.g. WEB_PORT=0 for a random free port) to run stacks in parallel.
+      - "${WEB_PORT:-8000}:8000"
+    environment:
+      # Include development dependencies when working locally
+      - UV_NO_DEV=0
+      - APP_VERSION=0.0.0
+    command: [ "uv", "run", "fastapi", "dev", "src/eventhub_core/main.py", "--host", "0.0.0.0", "--port", "8000" ]
+    # Run as root during development so the environment is mutable
+    # Alternatively, you could set `UV_PROJECT_ENVIRONMENT` to a path owned by the non-root user
+    user: root
+    volumes:
+      - .:/app
+      - /app/.venv
+    develop:
+      # Create a `watch` configuration to update the app
+      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
+      watch:
+        # Sync the working directory with the `/app` directory in the container
+        - action: sync
+          path: .
+          target: /app
+          # Exclude the project virtual environment — it could be for a
+          # different platform in the container
+          ignore:
+            - .venv/
+        # Rebuild the image if dependencies change by checking uv.lock
+        - action: rebuild
+          path: ./uv.lock
+
+  # identity-events-consumer:
+  #   image: eventhub/core-web:latest
+  #   command: [ "python", "packages/identity/bin/events_consumer.py" ]
+  #   user: root
+  #   volumes:
+  #     - .:/app
+  #     - /app/.venv
+  #   depends_on:
+  #     - rabbitmq
+  #     - redis
+  #   develop:
+  #     watch:
+  #       - path: ./packages/identity/src/identity/domain/events.py
+  #         target: /app/packages/identity/src/identity/domain/events.py
+  #         action: sync+restart
+  #       - path: ./packages/identity/src/identity/domain/listeners.py
+  #         target: /app/packages/identity/src/identity/domain/listeners.py
+  #         action: sync+restart
+
+  # foo-package-worker:
+  #   image: eventhub/core-web:latest
+  #   command: [ "celery", "-A", "packages.foo_package.src.foo_package.infra.tasks.app", "worker", "--loglevel=info" ]
+  #   user: root
+  #   volumes:
+  #     - .:/app
+  #     - /app/.venv
+  #   depends_on:
+  #     - rabbitmq
+  #     - redis
+  #   develop:
+  #     watch:
+  #       - path: ./packages/foo_package/src/foo_package/infra/tasks.py
+  #         target: /app/packages/foo_package/src/foo_package/infra/tasks.py
+  #         action: sync+restart
+
+  postgresql:
+    image: postgres:18
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - "database:/var/lib/postgresql"
+      - "./var/docker/postgresql/initdb.d:/docker-entrypoint-initdb.d"
+    environment:
+      POSTGRES_DB: eventhub
+      POSTGRES_USER: eventhub
+      POSTGRES_PASSWORD: eventhub
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: eventhub
+      RABBITMQ_DEFAULT_PASS: eventhub
+      # FIXME decrease the log level
+      # https://github.com/docker-library/rabbitmq/issues/118
+      #RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: -rabbit log.console.level warning
+
+volumes:
+  database:

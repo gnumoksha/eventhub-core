@@ -1,0 +1,12 @@
+extend = "../pyproject.toml"
+
+[lint]
+ignore = [
+    "E501",    # line length rule
+    "N818",    # exception name
+    "S101",    # usage of assert
+    "S311",    # Standard pseudo-random generators
+    "PLR2004", # Magic value used in comparison
+    "S105",    # Possible hardcoded password assigned to: {variable}
+    "ARG001",  # unused argument (necessary for mocks)
+]

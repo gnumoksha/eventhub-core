@@ -1,0 +1,11 @@
+**/*_test.py
+**/*.http
+**/__pycache__
+**/.mypy_cache/
+**/.ruff_cache/
+**/tests/
+.github
+.vscode
+.env
+.venv
+pylintrc

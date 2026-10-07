@@ -1,0 +1,42 @@
+version: 2
+
+updates:
+  - package-ecosystem: uv
+    cooldown:
+      default-days: 7
+    directory: "/"
+    schedule:
+      interval: daily
+      time: "11:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "patch"
+      development-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "patch"
+
+  - package-ecosystem: github-actions
+    cooldown:
+      default-days: 7
+    directory: "/"
+    schedule:
+      interval: daily
+      time: "11:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    groups:
+      actions:
+        patterns:
+          - "actions*"
+      aws-actions:
+        patterns:
+          - "aws-actions*"
