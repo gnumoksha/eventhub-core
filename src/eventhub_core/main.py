@@ -7,6 +7,7 @@ import identity.application
 import notifications.application
 import orders.application
 import payments.application
+import ticketing.application
 from access_control.infra.http.routers.setup import setup_routers as access_control_setup_routers
 from analytics.infra.http.routers.setup import setup_routers as analytics_setup_routers
 from events.infra.http.routers.setup import setup_routers as events_setup_routers
@@ -27,6 +28,7 @@ from shared.infra.logger import logger
 from shared.infra.observability.sentry import initialize_sentry
 from shared.settings import settings
 from starlette.middleware.sessions import SessionMiddleware
+from ticketing.infra.http.routers.setup import setup_routers as ticketing_setup_routers
 
 
 def traces_sampler(sampling_context: dict[str, Any]) -> float:
@@ -120,3 +122,6 @@ load_listeners(notifications.application)
 
 orders_setup_routers(app)
 load_listeners(orders.application)
+
+ticketing_setup_routers(app)
+load_listeners(ticketing.application)
