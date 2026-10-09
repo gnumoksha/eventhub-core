@@ -17,7 +17,7 @@ Vertical slices, in order:
 
 ## After the MVP
 
-- Transactional outbox + Unit of Work
+- Unit of Work
 - Offline check-in
 - Automatic payouts and chargeback handling
 - Coupons, affiliates and half-price tickets (*meia-entrada*)

@@ -38,6 +38,18 @@ services:
         - action: rebuild
           path: ./uv.lock
 
+  # Publishes the integration events stored in the transactional outbox
+  outbox-relay:
+    image: eventhub/core-web:latest
+    command: [ "uv", "run", "python", "-m", "eventhub_core.outbox_relay" ]
+    user: root
+    volumes:
+      - .:/app
+      - /app/.venv
+    depends_on:
+      - postgresql
+      - rabbitmq
+
   # identity-events-consumer:
   #   image: eventhub/core-web:latest
   #   command: [ "python", "packages/identity/bin/events_consumer.py" ]

@@ -29,3 +29,12 @@ class SyncDispatcher(Dispatcher):
 
         for func in _listeners[event.name()]:
             func(event)
+
+
+class RecordingDispatcher(Dispatcher):
+    def __init__(self) -> None:
+        self.dispatched: list[PublishableEvent] = []
+
+    @override
+    def dispatch(self, event: PublishableEvent) -> None:
+        self.dispatched.append(event)

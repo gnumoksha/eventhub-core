@@ -4,7 +4,8 @@ from shared.settings import settings
 # file with task definitions.
 # It is necessary because python needs to load the decorators.
 to_include = [
-    "identity/application/users/tasks",
+    "identity.application.accounts.tasks",
+    "events.infra.tasks",
 ]
 
 if settings.is_test():

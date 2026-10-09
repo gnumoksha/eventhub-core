@@ -111,8 +111,13 @@ _connection = RabbitMQConnection(
 _connection.on_first_channel(declare_events_topology)
 
 
-def __get_queue_dispatcher() -> RabbitMQDispatcher:
+def get_queue_dispatcher() -> RabbitMQDispatcher:
+    """Use it where FastAPI dependency injection is not available (e.g. Celery tasks)."""
     return RabbitMQDispatcher(_connection, JsonEncoder())
+
+
+def __get_queue_dispatcher() -> RabbitMQDispatcher:
+    return get_queue_dispatcher()
 
 
 QueueDispatcherDep = Annotated[RabbitMQDispatcher, Depends(__get_queue_dispatcher)]

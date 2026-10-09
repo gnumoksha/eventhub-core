@@ -94,7 +94,8 @@ class RabbitMQDispatcher(Dispatcher):
         try:
             self._publish(event)
             return
-        except AMQPConnectionError:
+        except AMQPConnectionError, OSError:
+            # pika does not always wrap socket failures (e.g. DNS resolution) in AMQPConnectionError
             logger.exception(
                 'Lost connection to RabbitMQ while dispatching event "%s", reconnecting',
                 event.NAME,
@@ -103,7 +104,7 @@ class RabbitMQDispatcher(Dispatcher):
 
         try:
             self._publish(event)
-        except AMQPConnectionError as exc:
+        except (AMQPConnectionError, OSError) as exc:
             raise EventDispatchError(f'Failed to dispatch event "{event.NAME}" after reconnecting') from exc
 
     def _publish(self, event: PublishableEvent) -> None:
