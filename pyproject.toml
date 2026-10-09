@@ -5,22 +5,24 @@ description = "A hub for your events"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "access_control",
     "alembic>=1.20.0",
     "alembic-postgresql-enum>=1.10.0",
-    "analytics",
     "celery[librabbitmq,redis]>=5.6.3",
+    "checkin",
     "events",
     "fastapi-injectable>=1.6.1",
     "fastapi[standard]>=0.141.1",
+    "finance",
     "identity",
     "itsdangerous>=2.2.0",
     "libs",
     "notifications",
-    "orders",
+    "organizers",
     "payments",
     "pika>=1.4.4",
     "psycopg2>=2.9.13",
+    "reporting",
+    "sales",
     "sentry-sdk[fastapi]>=2.70.0",
     "shared",
     "sqlmodel>=0.0.47",
@@ -42,14 +44,16 @@ requires = ["uv_build>=0.12.19,<0.13"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
-access_control = { workspace = true }
-analytics = { workspace = true }
+checkin = { workspace = true }
 events = { workspace = true }
+finance = { workspace = true }
 identity = { workspace = true }
 libs = { workspace = true }
 notifications = { workspace = true }
-orders = { workspace = true }
+organizers = { workspace = true }
 payments = { workspace = true }
+reporting = { workspace = true }
+sales = { workspace = true }
 shared = { workspace = true }
 ticketing = { workspace = true }
 

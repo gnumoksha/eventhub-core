@@ -4,23 +4,20 @@ requires-python = ">=3.14"
 
 [manifest]
 members = [
-    "access-control",
-    "analytics",
+    "checkin",
     "eventhub-core",
     "events",
+    "finance",
     "identity",
     "libs",
     "notifications",
-    "orders",
+    "organizers",
     "payments",
+    "reporting",
+    "sales",
     "shared",
     "ticketing",
 ]
-
-[[package]]
-name = "access-control"
-version = "0.1.0"
-source = { editable = "packages/access_control" }
 
 [[package]]
 name = "agent-detector"
@@ -69,11 +66,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/b2/a7/787f067b237d4b3bf
 wheels = [
     { url = "https://files.pythonhosted.org/packages/07/99/6b965aa99a32630c1c61ce57c9dcf81cec6fec354274a87f14525302b7f7/amqp-5.4.0-py3-none-any.whl", hash = "sha256:5d931d8442a403b6d4a5725a868a55edaa40734eae37d282b16be9fa710bd8ee", size = 51856, upload-time = "2026-09-19T08:39:38.404Z" },
 ]
-
-[[package]]
-name = "analytics"
-version = "0.1.0"
-source = { editable = "packages/analytics" }
 
 [[package]]
 name = "annotated-doc"
@@ -148,6 +140,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/a3/c2/24167ea9858356b47
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl", hash = "sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775", size = 136983, upload-time = "2026-07-22T03:35:11.276Z" },
 ]
+
+[[package]]
+name = "checkin"
+version = "0.1.0"
+source = { editable = "packages/checkin" }
 
 [[package]]
 name = "click"
@@ -241,22 +238,24 @@ name = "eventhub-core"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "access-control" },
     { name = "alembic" },
     { name = "alembic-postgresql-enum" },
-    { name = "analytics" },
     { name = "celery", extra = ["redis"] },
+    { name = "checkin" },
     { name = "events" },
     { name = "fastapi", extra = ["standard"] },
     { name = "fastapi-injectable" },
+    { name = "finance" },
     { name = "identity" },
     { name = "itsdangerous" },
     { name = "libs" },
     { name = "notifications" },
-    { name = "orders" },
+    { name = "organizers" },
     { name = "payments" },
     { name = "pika" },
     { name = "psycopg2" },
+    { name = "reporting" },
+    { name = "sales" },
     { name = "sentry-sdk", extra = ["fastapi"] },
     { name = "shared" },
     { name = "sqlmodel" },
@@ -275,22 +274,24 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "access-control", editable = "packages/access_control" },
     { name = "alembic", specifier = ">=1.20.0" },
     { name = "alembic-postgresql-enum", specifier = ">=1.10.0" },
-    { name = "analytics", editable = "packages/analytics" },
     { name = "celery", extras = ["librabbitmq", "redis"], specifier = ">=5.6.3" },
+    { name = "checkin", editable = "packages/checkin" },
     { name = "events", editable = "packages/events" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.141.1" },
     { name = "fastapi-injectable", specifier = ">=1.6.1" },
+    { name = "finance", editable = "packages/finance" },
     { name = "identity", editable = "packages/identity" },
     { name = "itsdangerous", specifier = ">=2.2.0" },
     { name = "libs", editable = "packages/libs" },
     { name = "notifications", editable = "packages/notifications" },
-    { name = "orders", editable = "packages/orders" },
+    { name = "organizers", editable = "packages/organizers" },
     { name = "payments", editable = "packages/payments" },
     { name = "pika", specifier = ">=1.4.4" },
     { name = "psycopg2", specifier = ">=2.9.13" },
+    { name = "reporting", editable = "packages/reporting" },
+    { name = "sales", editable = "packages/sales" },
     { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=2.70.0" },
     { name = "shared", editable = "packages/shared" },
     { name = "sqlmodel", specifier = ">=0.0.47" },
@@ -465,6 +466,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/7f/74/0adeb47b838c62ebd78bdf11ee2255e6e205ea176f9147978efa022ef855/fastar-0.12.0-cp315-cp315t-win_amd64.whl", hash = "sha256:00cda9a3f11871261a4e77a3b8f0eede85c9730fb7516811bcbcf96a2bb3b75b", size = 482858, upload-time = "2026-08-20T09:11:53.714Z" },
     { url = "https://files.pythonhosted.org/packages/bf/b9/b2ce5a79c57150d36aa8e0514dd65999ea76f091242aba93c403cd20e491/fastar-0.12.0-cp315-cp315t-win_arm64.whl", hash = "sha256:e8e0fb057b5c271f46f3300b539b0d3dab8c8cb2515205a37c818c2f68d16806", size = 458287, upload-time = "2026-08-20T09:11:36.952Z" },
 ]
+
+[[package]]
+name = "finance"
+version = "0.1.0"
+source = { editable = "packages/finance" }
 
 [[package]]
 name = "greenlet"
@@ -702,9 +708,9 @@ version = "0.1.0"
 source = { editable = "packages/notifications" }
 
 [[package]]
-name = "orders"
+name = "organizers"
 version = "0.1.0"
-source = { editable = "packages/orders" }
+source = { editable = "packages/organizers" }
 
 [[package]]
 name = "packaging"
@@ -963,6 +969,11 @@ wheels = [
 ]
 
 [[package]]
+name = "reporting"
+version = "0.1.0"
+source = { editable = "packages/reporting" }
+
+[[package]]
 name = "rich"
 version = "15.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1085,6 +1096,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/14/21/26e4643629b3ebb44f0a06f9c9a53058d63d989415f63a9a3c28e2ee7f22/ruff-0.16.9-py3-none-win_amd64.whl", hash = "sha256:6bd40fec8cd4c8a3d4dd589bd8ad4e6320c13c29234159bfd959a40d529d597b", size = 10592965, upload-time = "2026-09-24T20:37:44.944Z" },
     { url = "https://files.pythonhosted.org/packages/51/60/5fb1a39dbb5ae314d5f59bc7348a63c1d5c20f3cd83914c4b5cb0be31d2d/ruff-0.16.9-py3-none-win_arm64.whl", hash = "sha256:ed1a252039200f57a59eebc063b54beabea67bfbaaca0eeaa7f54b5fbcda2284", size = 10458649, upload-time = "2026-09-24T20:37:46.882Z" },
 ]
+
+[[package]]
+name = "sales"
+version = "0.1.0"
+source = { editable = "packages/sales" }
 
 [[package]]
 name = "sentry-sdk"

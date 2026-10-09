@@ -1,0 +1,90 @@
+[project]
+name = "organizers"
+version = "0.1.0"
+description = "eventhub organizers"
+requires-python = ">=3.14"
+readme = "README.md"
+dependencies = [
+]
+
+[tool.ruff]
+required-version = ">=0.8.0" # this is the version included with vscode extension
+line-length = 120
+# Explicitly set the source to the current directory.
+# When other configurations `extend` this one, they'll
+# use _this_ directory as `src`.
+# https://github.com/astral-sh/ruff/issues/4674#issuecomment-1565177104
+src = ["."]
+
+[tool.ruff.lint]
+# https://docs.astral.sh/ruff/rules/
+# Note: I checked all rules at 2025-01-08 and selected the ones that I think are useful.
+select = [
+    "F", # PyFlakes (detect errors)
+    "E", # pycodestyle (error)
+    "W", # pycodestyle (warning)
+    "C90", # mccabe
+    "I", # Organization of imports with isort
+    "N", # pep8-naming (N)
+    #"D", # pydocstyle, not useful
+    "UP", # automatically upgrade syntax for newer versions
+    "YTT", # checks for misuse of `sys.version` or `sys.version_info`
+    #"ANN", # flake8-annotations, not useful
+    "ASYNC", # flake8-async
+    "S", # flake8-bandit
+    "BLE", # flake8-blind-except
+    #"FBT", # we are already violating this rule in a way it is difficult to fix
+    #"B", #FIXME fix the code
+    "A", # Check for python builtins being used as variables or parameters
+    #"COM", # Flake8 lint for trailing commas. not useful
+    #"CPY", # not useful
+    #"C4", # we are already violating this rule in a way it is difficult to fix
+    #"DTZ", # we are already violating this rule in a way it is difficult to fix
+    "T10", # ipdb/pdb statement checker
+    #"EM", # not useful
+    "EXE", # for checking executable permissions and shebangs
+    #"FA", not useful
+    "ISC", # encourage correct string literal concatenation
+    #"ICN", # how certain packages should be imported or aliased, not useful
+    "LOG", # checks for issues using the standard library logging module
+    "G", # validate (lack of) logging format strings
+    #"INP", # not sure if it is useful
+    #"PIE", # not sure if it is useful
+    "T20", # print statement checker
+    #"PYI", # not useful
+    #"PT", # we are already violating this rule in a way it is difficult to fix
+    "Q", # lint for quotes
+    #"RSE", not useful
+    "RET", # checks return values
+    "SLF", # Private member access
+    #"SLOT", # I don't know what this is used for
+    #"SIM", # not so useful
+    #"TID", not useful
+    #"TC", # not so useful
+    "INT",
+    "ARG", # warn on unused function arguments
+    #"PTH", # not so useful
+    #"TD", # Lint TODO comments in a Python code
+    #"FIX", # not useful if we allow TODOs in the code
+    # "ERA", # Removes commented-out code
+    #"PD", # to lint pandas in an opinionated way. not useful
+    #"PGH", # not useful
+    "PL", # pylint
+    #"TRY", # we are already violating this rule in a way it is difficult to fix
+    #"FLY", # not useful
+    #"NPY", # NumPy-specific rules. not useful
+    #"FAST",
+    #"AIR", # airflow. not useful
+    #"PERF",
+    "FURB", # for refurbish and modernize Python codebases
+    #"DOC", # it is in preview
+    #"RUF",
+]
+ignore = [
+    "E501", # line length rule
+    "N818", # exception name
+    "S101", # use of assert
+]
+
+[tool.ruff.lint.flake8-builtins]
+builtins-ignorelist = ["id", "input"]
