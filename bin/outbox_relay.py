@@ -21,13 +21,17 @@ import reporting
 import sales
 import ticketing
 from libs.events import load_events
-from shared.infra.database import get_static_session
-from shared.infra.domain_events import get_queue_dispatcher
+from shared.infra.database import SessionDep
+from shared.infra.di import injectable
+from shared.infra.domain_events import QueueDispatcherDep
 from shared.infra.logger import logger
+from shared.infra.observability.sentry import initialize_sentry
 from shared.infra.outbox import OutboxRelay
 
 CONTEXTS = [checkin, events, finance, identity, notifications, organizers, payments, reporting, sales, ticketing]
 IDLE_SLEEP_SECONDS = 1.0
+
+initialize_sentry()
 
 
 class _StopSignal:
@@ -41,25 +45,25 @@ class _StopSignal:
         self.received = True
 
 
-def main() -> None:
+@injectable
+def main(dispatcher: QueueDispatcherDep, session: SessionDep) -> None:
     # the relay rebuilds the events from the outbox, so it must know every event class
     for context in CONTEXTS:
         load_events(context)
 
     stop = _StopSignal()
-    dispatcher = get_queue_dispatcher()
     logger.info("Outbox relay started")
 
+    published = 0
     while not stop.received:
-        with get_static_session() as session:
-            published = OutboxRelay(session, dispatcher).relay()
+        published = OutboxRelay(session, dispatcher).relay()
 
-        # nothing pending or the broker is down: wait before polling again
-        if published == 0:
-            time.sleep(IDLE_SLEEP_SECONDS)
+    # nothing pending or the broker is down: wait before polling again
+    if published == 0:
+        time.sleep(IDLE_SLEEP_SECONDS)
 
     logger.info("Outbox relay stopped")
 
 
 if __name__ == "__main__":
-    main()
+    main()  # ty:ignore[missing-argument]

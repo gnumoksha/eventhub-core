@@ -41,7 +41,7 @@ services:
   # Publishes the integration events stored in the transactional outbox
   outbox-relay:
     image: eventhub/core-web:latest
-    command: [ "uv", "run", "python", "-m", "eventhub_core.outbox_relay" ]
+    command: ["python", "bin/outbox_relay.py" ]
     user: root
     volumes:
       - .:/app
@@ -65,8 +65,8 @@ services:
   #       - path: ./packages/identity/src/identity/domain/events.py
   #         target: /app/packages/identity/src/identity/domain/events.py
   #         action: sync+restart
-  #       - path: ./packages/identity/src/identity/domain/listeners.py
-  #         target: /app/packages/identity/src/identity/domain/listeners.py
+  #       - path: ./packages/identity/src/identity/application/listeners.py
+  #         target: /app/packages/identity/src/identity/application/listeners.py
   #         action: sync+restart
 
   # foo-package-worker:
@@ -101,6 +101,12 @@ services:
     image: redis:8-alpine
     ports:
       - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   rabbitmq:
     image: rabbitmq:4-management
@@ -110,9 +116,15 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: eventhub
       RABBITMQ_DEFAULT_PASS: eventhub
-      # FIXME decrease the log level
-      # https://github.com/docker-library/rabbitmq/issues/118
-      #RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: -rabbit log.console.level warning
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    # TODO decrease the log level
+    # https://github.com/docker-library/rabbitmq/issues/118
+    #RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: -rabbit log.console.level warning
 
 volumes:
   database:

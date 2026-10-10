@@ -41,10 +41,10 @@ class Decoder(ABC):
 class JsonDecoder(Decoder):
     @override
     def decode(self, data: str | bytes) -> PublishableEvent:
-        data = json.loads(data)
-        event_name = data["name"]
-        metadata = Metadata.from_dict(data["metadata"])
-        payload = data["payload"]
+        decoded = json.loads(data)
+        event_name = decoded["name"]
+        metadata = Metadata.from_dict(decoded["metadata"])
+        payload = decoded["payload"]
 
         try:
             event_cls = PublishableEvent.for_name(event_name)

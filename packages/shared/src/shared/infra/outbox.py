@@ -28,7 +28,7 @@ _ERROR_MAX_LENGTH = 2000
 
 
 class OutboxMessage(SQLModel, table=True):
-    __tablename__: str = "outbox_messages"
+    __tablename__: str = "outbox_messages"  # type:ignore
     __table_args__ = (
         # only the pending messages are queried, so the index stays small as published messages pile up
         Index(
@@ -40,7 +40,7 @@ class OutboxMessage(SQLModel, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=uuid_compat.uuid7, primary_key=True)
-    event_name: str = Field(max_length=200)
+    event_name: str = Field(max_length=PublishableEvent.NAME_MAX_LENGTH)
     message: dict[str, Any] = Field(sa_type=JSONB)
     """The event encoded by JsonEncoder: name, metadata and payload."""
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
