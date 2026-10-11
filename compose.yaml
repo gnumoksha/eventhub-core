@@ -41,49 +41,46 @@ services:
   # Publishes the integration events stored in the transactional outbox
   outbox-relay:
     image: eventhub/core-web:latest
-    command: ["python", "bin/outbox_relay.py" ]
+    command: ["uv", "run", "python", "-m", "bin.outbox_relay"]
     user: root
     volumes:
       - .:/app
       - /app/.venv
     depends_on:
-      - postgresql
-      - rabbitmq
+      postgresql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
-  # identity-events-consumer:
+  # it uses ~75MiB of memory
+  # consumer-checkin:
   #   image: eventhub/core-web:latest
-  #   command: [ "python", "packages/identity/bin/events_consumer.py" ]
+  #   command: ["uv", "run", "python", "-m", "packages.checkin.bin.events_consumer"]
   #   user: root
   #   volumes:
   #     - .:/app
   #     - /app/.venv
   #   depends_on:
+  #     - postgresql
   #     - rabbitmq
-  #     - redis
-  #   develop:
-  #     watch:
-  #       - path: ./packages/identity/src/identity/domain/events.py
-  #         target: /app/packages/identity/src/identity/domain/events.py
-  #         action: sync+restart
-  #       - path: ./packages/identity/src/identity/application/listeners.py
-  #         target: /app/packages/identity/src/identity/application/listeners.py
-  #         action: sync+restart
 
-  # foo-package-worker:
-  #   image: eventhub/core-web:latest
-  #   command: [ "celery", "-A", "packages.foo_package.src.foo_package.infra.tasks.app", "worker", "--loglevel=info" ]
-  #   user: root
-  #   volumes:
-  #     - .:/app
-  #     - /app/.venv
-  #   depends_on:
-  #     - rabbitmq
-  #     - redis
-  #   develop:
-  #     watch:
-  #       - path: ./packages/foo_package/src/foo_package/infra/tasks.py
-  #         target: /app/packages/foo_package/src/foo_package/infra/tasks.py
-  #         action: sync+restart
+  # it uses ~488MiB of memory, less than the approach of one container per consumer
+  # check it by running:
+  # docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}" | grep "events-consumers"
+  events-consumers:
+    image: eventhub/core-web:latest
+    command: ["uv", "run", "honcho", "start"]
+    environment:
+      - UV_NO_DEV=0
+    user: root
+    volumes:
+      - .:/app
+      - /app/.venv
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   postgresql:
     image: postgres:18
@@ -96,6 +93,12 @@ services:
       POSTGRES_DB: eventhub
       POSTGRES_USER: eventhub
       POSTGRES_PASSWORD: eventhub
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "eventhub", "-d", "eventhub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   redis:
     image: redis:8-alpine
@@ -120,7 +123,7 @@ services:
       test: rabbitmq-diagnostics check_port_connectivity
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
       start_period: 60s
     # TODO decrease the log level
     # https://github.com/docker-library/rabbitmq/issues/118
