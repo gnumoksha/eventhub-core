@@ -1,5 +1,5 @@
 # Libs
 
-Libraries that does not depends on the application.
+Libraries that do not depend on the application, such as the domain events infrastructure (events, dispatchers, RabbitMQ publisher and consumer).
 
-You could think about this as reusable libraries that could be in separated repositories but they are here for simplicity.
+Think of them as reusable libraries that could live in separate repositories, but are kept here for simplicity. This is not a bounded context.
