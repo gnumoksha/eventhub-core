@@ -1,7 +1,7 @@
 """
 Publishes the integration events stored in the transactional outbox.
 
-Run it with: uv run python -m eventhub_core.outbox_relay
+Run it with: uv run python -m bin.outbox_relay
 
 Many instances can run at the same time: each message is locked while it is published.
 """
@@ -54,13 +54,13 @@ def main(dispatcher: QueueDispatcherDep, session: SessionDep) -> None:
     stop = _StopSignal()
     logger.info("Outbox relay started")
 
-    published = 0
+    relay = OutboxRelay(session, dispatcher)
     while not stop.received:
-        published = OutboxRelay(session, dispatcher).relay()
+        published = relay.relay()
 
-    # nothing pending or the broker is down: wait before polling again
-    if published == 0:
-        time.sleep(IDLE_SLEEP_SECONDS)
+        # nothing pending or the broker is down: wait before polling again
+        if published == 0:
+            time.sleep(IDLE_SLEEP_SECONDS)
 
     logger.info("Outbox relay stopped")
 

@@ -3,4 +3,5 @@ extend = "../pyproject.toml"
 [lint]
 ignore = [
     "UP007", # use X | Y for type annotation
+    "F401",  # imported but unused
 ]

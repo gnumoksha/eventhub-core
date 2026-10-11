@@ -8,6 +8,7 @@ https://github.com/sheshbabu/fastapi-structured-json-logging-demo/blob/0ee5f2def
 import json
 import logging
 from logging import Formatter
+from typing import override
 
 from shared.settings import settings
 
@@ -50,9 +51,7 @@ class JsonFormatter(Formatter):
 # rendering (`message`, `asctime`) — diffed against record.__dict__ below to isolate exactly the
 # fields a caller passed via `extra=`, nothing from the record's own bookkeeping.
 _RESERVED_LOG_RECORD_ATTRS = frozenset(
-    logging.LogRecord(
-        name="", level=0, pathname="", lineno=0, msg="", args=(), exc_info=None
-    ).__dict__.keys()
+    logging.LogRecord(name="", level=0, pathname="", lineno=0, msg="", args=(), exc_info=None).__dict__.keys()
 ) | {"message", "asctime"}
 
 
@@ -63,17 +62,12 @@ class DevFormatter(Formatter):
     """
 
     def __init__(self) -> None:
-        super().__init__(
-            fmt="%(asctime)s [%(levelname)s] - %(name)s.%(funcName)s: %(message)s"
-        )
+        super().__init__(fmt="%(asctime)s [%(levelname)s] - %(name)s.%(funcName)s: %(message)s")
 
+    @override
     def format(self, record: logging.LogRecord) -> str:
         base = super().format(record)
-        extras = {
-            key: value
-            for key, value in record.__dict__.items()
-            if key not in _RESERVED_LOG_RECORD_ATTRS
-        }
+        extras = {key: value for key, value in record.__dict__.items() if key not in _RESERVED_LOG_RECORD_ATTRS}
         if not extras:
             return base
         try:

@@ -28,7 +28,7 @@ _ERROR_MAX_LENGTH = 2000
 
 
 class OutboxMessage(SQLModel, table=True):
-    __tablename__: str = "outbox_messages"  # type:ignore
+    __tablename__: str = "outbox_messages"
     __table_args__ = (
         # only the pending messages are queried, so the index stays small as published messages pile up
         Index(
@@ -78,6 +78,13 @@ class OutboxRelay:
 
         Stops at the first dispatch failure (e.g. broker down) so that messages keep their order.
         """
+        try:
+            return self._relay(batch_size)
+        finally:
+            # never leave a transaction open between calls: it would hold locks (blocking migrations) and block vacuum
+            self._session.rollback()
+
+    def _relay(self, batch_size: int) -> int:
         published = 0
         while published < batch_size:
             message = self._claim_next()

@@ -24,7 +24,7 @@ def event_payload() -> dict:
     return {
         "title": "Festival",
         "description": "Music all day long",
-        "age_rating": "14",
+        "age_rating": "AGE_14",
         "venue": {
             "type": "physical",
             "name": "Allianz Parque",
@@ -57,7 +57,7 @@ def test_create_and_get_event(client: TestClient):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "draft"
+    assert body["status"] == "DRAFT"
     assert body["venue"]["address"]["postal_code"] == "05001200"
 
 
@@ -65,16 +65,16 @@ def test_full_lifecycle(client: TestClient):
     event_id = create_event(client)["id"]
     new_start = NOW + timedelta(days=60)
 
-    assert client.post(f"/events/{event_id}/publish").json()["status"] == "published"
+    assert client.post(f"/events/{event_id}/publish").json()["status"] == "PUBLISHED"
 
     postponed = client.post(
         f"/events/{event_id}/postpone",
         json={"start_at": new_start.isoformat(), "end_at": (new_start + timedelta(hours=6)).isoformat()},
     )
-    assert postponed.json()["status"] == "postponed"
+    assert postponed.json()["status"] == "POSTPONED"
 
     cancelled = client.post(f"/events/{event_id}/cancel", json={"reason": "Storm"})
-    assert cancelled.json()["status"] == "cancelled"
+    assert cancelled.json()["status"] == "CANCELLED"
     assert cancelled.json()["cancellation_reason"] == "Storm"
 
 
@@ -84,7 +84,7 @@ def test_list_organization_events(client: TestClient):
     create_event(client, organization_id)
     client.post(f"/events/{first['id']}/publish")
 
-    response = client.get(f"/organizations/{organization_id}/events", params={"status": "published"})
+    response = client.get(f"/organizations/{organization_id}/events", params={"status": "PUBLISHED"})
 
     assert response.status_code == 200
     assert [e["id"] for e in response.json()] == [first["id"]]

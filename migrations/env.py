@@ -1,7 +1,8 @@
 from logging.config import fileConfig
 
-import events.infra.persistence.event_record  # noqa: F401  # register the tables in the metadata
-import shared.infra.outbox  # noqa: F401
+import alembic_postgresql_enum  # detects changes in the values of PostgreSQL enums
+import events.domain.models.event.event  # register the tables in the metadata
+import shared.infra.outbox
 from alembic import context
 from shared.settings import settings
 from sqlalchemy import engine_from_config, pool

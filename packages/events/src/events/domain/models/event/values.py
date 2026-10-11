@@ -12,23 +12,27 @@ EventID = uuid.UUID
 OrganizationID = uuid.UUID
 
 
+# The enum values are equal to their names because the database stores the names
+# (see the Event columns), so the API returns exactly what is in the database.
+
+
 class EventStatus(StrEnum):
-    DRAFT = "draft"
-    PUBLISHED = "published"
-    POSTPONED = "postponed"
-    CANCELLED = "cancelled"
-    FINISHED = "finished"
+    DRAFT = "DRAFT"
+    PUBLISHED = "PUBLISHED"
+    POSTPONED = "POSTPONED"
+    CANCELLED = "CANCELLED"
+    FINISHED = "FINISHED"
 
 
 class AgeRating(StrEnum):
     """Brazilian indicative rating (ClassInd)."""
 
-    ALL_AGES = "L"
-    AGE_10 = "10"
-    AGE_12 = "12"
-    AGE_14 = "14"
-    AGE_16 = "16"
-    AGE_18 = "18"
+    ALL_AGES = "ALL_AGES"
+    AGE_10 = "AGE_10"
+    AGE_12 = "AGE_12"
+    AGE_14 = "AGE_14"
+    AGE_16 = "AGE_16"
+    AGE_18 = "AGE_18"
 
 
 @dataclass(frozen=True, slots=True)
