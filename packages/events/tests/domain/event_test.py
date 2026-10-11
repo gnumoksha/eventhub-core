@@ -1,10 +1,10 @@
 from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
-from events.domain.errors import InvalidStateTransition, InvalidValue
 from events.domain.models.event.event import Event
 from events.domain.models.event.events import EventCancelled, EventFinished, EventPostponed, EventPublished
 from events.domain.models.event.values import Address, AgeRating, EventPeriod, EventStatus, OnlineVenue
+from shared.domain.errors import InvalidStateTransition, InvalidValue
 
 from tests.conftest import NOW, make_draft, make_period, make_published, make_venue
 

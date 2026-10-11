@@ -1,9 +1,8 @@
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
-from shared.domain.errors import DomainError
+from shared.domain.errors import ConcurrencyConflict, DomainError, InvalidStateTransition, InvalidValue
 
 from events.application.event.service import EventNotFound
-from events.domain.errors import ConcurrencyConflict, InvalidStateTransition, InvalidValue
 from events.infra.http.routers.events import router as events_router
 
 

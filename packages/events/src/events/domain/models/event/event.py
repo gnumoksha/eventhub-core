@@ -5,8 +5,8 @@ from typing import Self
 
 import uuid_utils.compat as uuid_compat
 from libs.events import PublishableEvent
+from shared.domain.errors import InvalidStateTransition, InvalidValue
 
-from events.domain.errors import InvalidStateTransition, InvalidValue
 from events.domain.models.event.events import EventCancelled, EventFinished, EventPostponed, EventPublished
 from events.domain.models.event.values import (
     AgeRating,

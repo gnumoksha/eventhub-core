@@ -1,10 +1,10 @@
 from datetime import datetime
 from typing import Any
 
+from shared.domain.errors import ConcurrencyConflict
 from shared.infra.outbox import add_to_outbox
 from sqlmodel import Session, col, select, update
 
-from events.domain.errors import ConcurrencyConflict
 from events.domain.models.event.event import Event
 from events.domain.models.event.values import (
     Address,

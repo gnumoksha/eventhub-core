@@ -2,9 +2,9 @@ from collections.abc import Iterator
 from datetime import timedelta
 
 import pytest
-from events.domain.errors import ConcurrencyConflict
 from events.domain.models.event.repository import EventRepository
 from events.domain.models.event.values import EventStatus, OnlineVenue
+from shared.domain.errors import ConcurrencyConflict
 from shared.infra.database import engine
 from shared.infra.outbox import OutboxMessage
 from sqlmodel import Session, col, select

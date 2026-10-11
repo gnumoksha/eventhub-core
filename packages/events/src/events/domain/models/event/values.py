@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from events.domain.errors import InvalidValue
+from shared.domain.errors import InvalidValue
 
 EventID = uuid.UUID
 OrganizationID = uuid.UUID
