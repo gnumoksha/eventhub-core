@@ -3,8 +3,8 @@ from datetime import timedelta
 
 import pytest
 from events.domain.errors import ConcurrencyConflict
+from events.domain.models.event.repository import EventRepository
 from events.domain.models.event.values import EventStatus, OnlineVenue
-from events.infra.persistence.sql_event_repository import SqlEventRepository
 from shared.infra.database import engine
 from shared.infra.outbox import OutboxMessage
 from sqlmodel import Session, col, select
@@ -28,8 +28,8 @@ def session() -> Iterator[Session]:
 
 
 @pytest.fixture
-def repository(session: Session) -> SqlEventRepository:
-    return SqlEventRepository(session)
+def repository(session: Session) -> EventRepository:
+    return EventRepository(session)
 
 
 def outbox_event_names(session: Session, event_id: object) -> list[str]:
@@ -37,7 +37,7 @@ def outbox_event_names(session: Session, event_id: object) -> list[str]:
     return [m.event_name for m in messages if m.message["payload"].get("event_id") == str(event_id)]
 
 
-def test_round_trip(repository: SqlEventRepository):
+def test_round_trip(repository: EventRepository):
     event = make_draft()
 
     repository.save(event)
@@ -51,7 +51,7 @@ def test_round_trip(repository: SqlEventRepository):
     assert loaded.status == EventStatus.DRAFT
 
 
-def test_updates_and_increments_version(repository: SqlEventRepository):
+def test_updates_and_increments_version(repository: EventRepository):
     event = make_draft()
     repository.save(event)
 
@@ -66,7 +66,7 @@ def test_updates_and_increments_version(repository: SqlEventRepository):
     assert loaded.venue == OnlineVenue(url="https://meet.example.com/x")
 
 
-def test_concurrent_update_is_rejected(repository: SqlEventRepository):
+def test_concurrent_update_is_rejected(repository: EventRepository):
     event = make_draft()
     repository.save(event)
     first = repository.get(event.id)
@@ -82,7 +82,7 @@ def test_concurrent_update_is_rejected(repository: SqlEventRepository):
         repository.save(second)
 
 
-def test_list_ended_but_not_finished(repository: SqlEventRepository):
+def test_list_ended_but_not_finished(repository: EventRepository):
     event = make_draft()
     event.publish(NOW)
     repository.save(event)
@@ -94,7 +94,7 @@ def test_list_ended_but_not_finished(repository: SqlEventRepository):
     assert event.id in [e.id for e in ended]
 
 
-def test_stores_integration_events_in_the_outbox(repository: SqlEventRepository, session: Session):
+def test_stores_integration_events_in_the_outbox(repository: EventRepository, session: Session):
     event = make_draft()
     event.publish(NOW)
 
@@ -104,7 +104,7 @@ def test_stores_integration_events_in_the_outbox(repository: SqlEventRepository,
     assert event.pull_events() == []
 
 
-def test_concurrency_conflict_does_not_store_integration_events(repository: SqlEventRepository, session: Session):
+def test_concurrency_conflict_does_not_store_integration_events(repository: EventRepository, session: Session):
     event = make_draft()
     event.publish(NOW)
     repository.save(event)
