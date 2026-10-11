@@ -48,9 +48,11 @@ jobs:
         run: uv run ruff check packages/ src/
 
       - name: Ruff format
+        # fix errors running: uv run ruff format bin/ packages/ src/
         run: uv run ruff format --check bin/ packages/ src/
 
       - name: ty
+        # fix errors running: uv run ty check --error-on-warning --fix bin/ packages/ src/
         run: |
           uv run ty check --error-on-warning --output-format github bin/ packages/ src/ \
           --exclude packages/libs/tests

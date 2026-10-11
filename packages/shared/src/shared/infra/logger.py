@@ -17,7 +17,7 @@ class JsonFormatter(Formatter):
     def __init__(self):
         super().__init__()
 
-    def format(self, record) -> str:  # type: ignore
+    def format(self, record) -> str:
         json_record = {}
         json_record["timestamp"] = self.formatTime(record, self.datefmt)
         json_record["levelname"] = record.levelname

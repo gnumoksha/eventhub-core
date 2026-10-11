@@ -55,11 +55,11 @@ class RabbitMQConnection:
             if params.client_properties is None:
                 params.client_properties = {}
             if self._name:
-                params.client_properties["connection_name"] = self._name
+                params.client_properties["connection_name"] = self._name  # type:ignore
 
-            self._connection = pika.BlockingConnection(params)
+            self._connection = pika.BlockingConnection(params)  # type:ignore
 
-        return self._connection
+        return self._connection  # type:ignore
 
     def reset_connection(self) -> None:
         self._connection = None

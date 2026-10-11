@@ -74,12 +74,12 @@ class Settings(BaseSettings):
 
 
 # Values will be read from .env or environment variables
-settings = Settings()  # type: ignore
+settings = Settings()
 
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # type: ignore
+    return Settings()
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
