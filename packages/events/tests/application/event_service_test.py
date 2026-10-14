@@ -5,8 +5,9 @@ import pytest
 from events.application.event.service import EventNotFound, EventService
 from events.domain.models.event.events import EventFinished, EventPublished
 from events.domain.models.event.values import AgeRating, EventStatus
+from libs.time_utils import FakeClock
 
-from tests.conftest import FakeClock, InMemoryEventRepository, make_period, make_venue
+from tests.conftest import InMemoryEventRepository, make_period, make_venue
 
 
 def create_draft(service: EventService, organization_id: uuid.UUID | None = None):
@@ -56,7 +57,7 @@ def test_finish_ended_events(service: EventService, repository: InMemoryEventRep
     service.publish(ended.id)
     not_published = create_draft(service)
     assert ended.period is not None
-    clock.now = ended.period.end_at + timedelta(minutes=1)
+    clock.dt = ended.period.end_at + timedelta(minutes=1)
     repository.outbox.clear()
 
     finished = service.finish_ended_events()
