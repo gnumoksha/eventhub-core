@@ -1,3 +1,7 @@
+"""
+Value objects for service's Inputs and Outputs.
+"""
+
 import uuid
 from datetime import datetime
 from typing import Annotated, Literal

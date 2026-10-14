@@ -12,10 +12,6 @@ EventID = uuid.UUID
 OrganizationID = uuid.UUID
 
 
-# The enum values are equal to their names because the database stores the names
-# (see the Event columns), so the API returns exactly what is in the database.
-
-
 class EventStatus(StrEnum):
     DRAFT = "DRAFT"
     PUBLISHED = "PUBLISHED"
