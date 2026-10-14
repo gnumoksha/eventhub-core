@@ -16,6 +16,7 @@ from events.domain.models.event.values import (
     PhysicalVenue,
 )
 from libs.events import PublishableEvent
+from libs.time_utils import FakeClock
 
 NOW = datetime(2030, 1, 10, 12, 0, tzinfo=UTC)
 
@@ -58,14 +59,6 @@ class InMemoryEventRepository(EventRepository):
             for e in self.events.values()
             if e.status in (EventStatus.PUBLISHED, EventStatus.POSTPONED) and e.period and e.period.has_ended(now)
         ][:limit]
-
-
-class FakeClock:
-    def __init__(self, now: datetime = NOW) -> None:
-        self.now = now
-
-    def __call__(self) -> datetime:
-        return self.now
 
 
 def make_period(days_from_now: int = 30, duration_hours: int = 4, now: datetime = NOW) -> EventPeriod:
@@ -113,7 +106,7 @@ def repository() -> InMemoryEventRepository:
 
 @pytest.fixture
 def clock() -> FakeClock:
-    return FakeClock()
+    return FakeClock(NOW)
 
 
 @pytest.fixture

@@ -1,15 +1,8 @@
-from collections.abc import Callable
-from datetime import UTC, datetime
+from libs.time_utils import Clock, utc_now
 
 from events.domain.models.event.event import Event
 from events.domain.models.event.repository import EventRepository
 from events.domain.models.event.values import AgeRating, EventID, EventPeriod, EventStatus, OrganizationID, Venue
-
-Clock = Callable[[], datetime]
-
-
-def utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class EventNotFound(Exception):
