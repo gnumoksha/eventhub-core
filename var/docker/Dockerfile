@@ -13,7 +13,6 @@ RUN set -eux; \
     apt-get update && \
     apt-get install -y --no-install-recommends \
     git  \
-    openssh-client \
     python3-dev \
     libpq-dev \
     build-essential \
@@ -50,10 +49,6 @@ FROM base AS production
 # Omit development dependencies
 ENV UV_NO_DEV=1
 
-RUN mkdir -p -m 0700 /root/.ssh \
-    && ssh-keyscan -H github.com >> /root/.ssh/known_hosts \
-    && chmod 644 /root/.ssh/known_hosts
-
 # In the reference the following was used to install the dependencies before
 # copying the entire source code. Here it is not possible because uv complains
 # about the missing packages/ directory.
@@ -74,7 +69,6 @@ COPY ./alembic.ini /app/alembic.ini
 COPY ./README.md /app/README.md
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=ssh \
     uv sync --locked
 
 ARG APP_VERSION
