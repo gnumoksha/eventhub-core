@@ -2,8 +2,7 @@ import uuid
 from datetime import timedelta
 
 import pytest
-from events.application.event.service import EventService
-from events.infra.http.dependencies import get_event_service
+from events.application.event.service import EventService, __get_service
 from events.infra.http.routers.setup import setup_routers
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -15,7 +14,7 @@ from tests.conftest import NOW
 def client(service: EventService) -> TestClient:
     app = FastAPI()
     setup_routers(app)
-    app.dependency_overrides[get_event_service] = lambda: service
+    app.dependency_overrides[__get_service] = lambda: service
     return TestClient(app)
 
 

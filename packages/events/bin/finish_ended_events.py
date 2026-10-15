@@ -17,4 +17,4 @@ def main(service: EventServiceDep):
 
 
 if __name__ == "__main__":
-    main()  # ty:ignore[missing-argument]
+    main()
