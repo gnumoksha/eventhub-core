@@ -1,25 +1,10 @@
 from typing import Self, override
 
 from libs.events.dispatcher import RecordingDispatcher, SyncDispatcher
-from libs.events.event import Config, Metadata, PublishableEvent, SerializableDict
+from libs.events.event import Metadata, PublishableEvent, SerializableDict
 from libs.events.listener import _listeners, listener
 
-
-class DummyConfig(Config):
-    @property
-    @override
-    def exchange(self) -> str:
-        return "events"
-
-    @property
-    @override
-    def queue(self) -> str:
-        return "events_queue"
-
-    @property
-    @override
-    def routing_key(self) -> str:
-        return "events.test"
+from tests.conftest import DummyConfig
 
 
 class EventA(PublishableEvent, name="test:event_a"):

@@ -3,24 +3,9 @@ from typing import Self, override
 
 import pytest
 from libs.events.encoding import JsonDecoder, JsonEncoder, UnmappedEventError
-from libs.events.event import Config, Metadata, PublishableEvent, SerializableDict
+from libs.events.event import Metadata, PublishableEvent, SerializableDict
 
-
-class DummyConfig(Config):
-    @property
-    @override
-    def exchange(self) -> str:
-        return "events"
-
-    @property
-    @override
-    def queue(self) -> str:
-        return "events_queue"
-
-    @property
-    @override
-    def routing_key(self) -> str:
-        return "events.dummy"
+from tests.conftest import DummyConfig
 
 
 class EncodableEvent(PublishableEvent, name="test:encodable_event"):

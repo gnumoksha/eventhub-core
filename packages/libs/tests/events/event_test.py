@@ -3,24 +3,9 @@ from datetime import UTC, datetime
 from typing import Self, override
 
 import pytest
-from libs.events.event import Config, Metadata, PublishableEvent, SerializableDict
+from libs.events.event import Metadata, PublishableEvent, SerializableDict
 
-
-class DummyConfig(Config):
-    @property
-    @override
-    def exchange(self) -> str:
-        return "test_exchange"
-
-    @property
-    @override
-    def queue(self) -> str:
-        return "test_queue"
-
-    @property
-    @override
-    def routing_key(self) -> str:
-        return "test_key"
+from tests.conftest import DummyConfig
 
 
 class SampleEvent(PublishableEvent, name="test:sample_event"):
@@ -109,7 +94,7 @@ class TestPublishableEvent:
         event = SampleEvent("hello")
         assert event.metadata is not None
         assert isinstance(event.metadata.id, uuid.UUID)
-        assert event.config.exchange == "test_exchange"
+        assert event.config.exchange == "exchange_test"
 
         custom_meta = Metadata(schema_version="3.0.0")
         event_with_custom = SampleEvent("world", metadata=custom_meta)
