@@ -5,8 +5,6 @@ services:
       context: .
       dockerfile: ./var/docker/Dockerfile
       target: production
-      ssh:
-        - default
     ports:
       # Default to the classic port for a plain `docker compose up`. Override per
       # worktree (e.g. WEB_PORT=0 for a random free port) to run stacks in parallel.
