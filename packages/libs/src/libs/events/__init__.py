@@ -1,4 +1,4 @@
-from .dispatcher import Dispatcher, SyncDispatcher
+from .dispatcher import Dispatcher, EventDispatchError, RecordingDispatcher, SyncDispatcher
 from .encoding import JsonDecoder, JsonEncoder
 from .event import Config, Metadata, PublishableEvent, SerializableDict
 from .listener import listener
@@ -17,7 +17,9 @@ __all__ = [
     "JsonEncoder",
     "JsonDecoder",
     "Dispatcher",
+    "EventDispatchError",
     "SyncDispatcher",
+    "RecordingDispatcher",
     "listener",
     "load_listeners",
     "load_events",

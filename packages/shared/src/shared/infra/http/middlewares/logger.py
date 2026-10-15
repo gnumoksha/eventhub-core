@@ -1,7 +1,6 @@
-from starlette.middleware.base import BaseHTTPMiddleware
-
 from shared.infra.logger import logger
 from shared.settings import settings
+from starlette.middleware.base import BaseHTTPMiddleware
 
 
 class LogMiddleware(BaseHTTPMiddleware):

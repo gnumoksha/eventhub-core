@@ -1,22 +1,27 @@
 from typing import Any
 
-import access_control.domain
-import analytics.domain
-import events.domain
-import identity.domain
-import notifications.domain
-import orders.domain
-import payments.domain
-from access_control.infra.http.routers.setup import setup_routers as access_control_setup_routers
-from analytics.infra.http.routers.setup import setup_routers as analytics_setup_routers
+import checkin.application
+import events.application
+import finance.application
+import identity.application
+import notifications.application
+import organizers.application
+import payments.application
+import reporting.application
+import sales.application
+import ticketing.application
+from checkin.infra.http.routers.setup import setup_routers as checkin_setup_routers
 from events.infra.http.routers.setup import setup_routers as events_setup_routers
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from finance.infra.http.routers.setup import setup_routers as finance_setup_routers
 from identity.infra.http.routers.setup import setup_routers as identity_setup_routers
 from libs.events import load_listeners
 from notifications.infra.http.routers.setup import setup_routers as notifications_setup_routers
-from orders.infra.http.routers.setup import setup_routers as orders_setup_routers
+from organizers.infra.http.routers.setup import setup_routers as organizers_setup_routers
 from payments.infra.http.routers.setup import setup_routers as payments_setup_routers
+from reporting.infra.http.routers.setup import setup_routers as reporting_setup_routers
+from sales.infra.http.routers.setup import setup_routers as sales_setup_routers
 from shared.infra.app_status.inputs import Mode, ShowAppStatusInput
 from shared.infra.app_status.outputs import ShowAppStatusOutput
 from shared.infra.app_status.services import AppStatusServiceDep
@@ -27,6 +32,7 @@ from shared.infra.logger import logger
 from shared.infra.observability.sentry import initialize_sentry
 from shared.settings import settings
 from starlette.middleware.sessions import SessionMiddleware
+from ticketing.infra.http.routers.setup import setup_routers as ticketing_setup_routers
 
 
 def traces_sampler(sampling_context: dict[str, Any]) -> float:
@@ -100,23 +106,32 @@ def app_status(
     return service.execute(input_)
 
 
-access_control_setup_routers(app)
-load_listeners(access_control.domain)
+identity_setup_routers(app)
+load_listeners(identity.application)
 
-analytics_setup_routers(app)
-load_listeners(analytics.domain)
-
-payments_setup_routers(app)
-load_listeners(payments.domain)
+organizers_setup_routers(app)
+load_listeners(organizers.application)
 
 events_setup_routers(app)
-load_listeners(events.domain)
+load_listeners(events.application)
 
-identity_setup_routers(app)
-load_listeners(identity.domain)
+sales_setup_routers(app)
+load_listeners(sales.application)
+
+payments_setup_routers(app)
+load_listeners(payments.application)
+
+ticketing_setup_routers(app)
+load_listeners(ticketing.application)
+
+checkin_setup_routers(app)
+load_listeners(checkin.application)
+
+finance_setup_routers(app)
+load_listeners(finance.application)
 
 notifications_setup_routers(app)
-load_listeners(notifications.domain)
+load_listeners(notifications.application)
 
-orders_setup_routers(app)
-load_listeners(orders.domain)
+reporting_setup_routers(app)
+load_listeners(reporting.application)

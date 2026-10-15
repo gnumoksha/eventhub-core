@@ -103,6 +103,8 @@ class PublishableEvent(ABC):
     NAME: str
     """The event name"""
 
+    NAME_MAX_LENGTH: int = 200
+
     _registry: dict[str, type[Self]] = {}
     """Contains the event's name and its class"""
 
@@ -112,6 +114,11 @@ class PublishableEvent(ABC):
           - name: the event name
         """
         super().__init_subclass__(**kwargs)
+
+        if len(name) == 0:
+            raise ValueError("Event name can not be empty")
+        if len(name) > cls.NAME_MAX_LENGTH:
+            raise ValueError("Event name must be up to 200 characters long")
 
         cls.NAME = name
         PublishableEvent._registry[name] = cls

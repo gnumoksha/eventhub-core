@@ -13,7 +13,7 @@ def initialize_sentry(
     include_http_integrations: bool = False,
     traces_sampler: Callable[[dict[str, Any]], float] | None = None,
 ) -> None:
-    if not settings.is_prod_like():
+    if not settings.is_prod_like() or not settings.SENTRY_DSN:
         return
 
     integrations: list[Integration] = [
@@ -30,7 +30,7 @@ def initialize_sentry(
         )
 
     sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
+        dsn=str(settings.SENTRY_DSN),
         environment=settings.APP_ENV,
         release=settings.APP_VERSION,
         send_default_pii=True,

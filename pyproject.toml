@@ -5,30 +5,34 @@ description = "A hub for your events"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "access_control",
     "alembic>=1.20.0",
     "alembic-postgresql-enum>=1.10.0",
-    "analytics",
     "celery[librabbitmq,redis]>=5.6.3",
+    "checkin",
     "events",
     "fastapi-injectable>=1.6.1",
     "fastapi[standard]>=0.141.1",
+    "finance",
     "identity",
     "itsdangerous>=2.2.0",
     "libs",
     "notifications",
-    "orders",
+    "organizers",
     "payments",
     "pika>=1.4.4",
     "psycopg2>=2.9.13",
+    "reporting",
+    "sales",
     "sentry-sdk[fastapi]>=2.70.0",
     "shared",
     "sqlmodel>=0.0.47",
+    "ticketing",
     "uuid-utils>=1.0.0",
 ]
 
 [dependency-groups]
 dev = [
+    "honcho>=2.0.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-mock>=3.15.1",
@@ -41,15 +45,18 @@ requires = ["uv_build>=0.12.19,<0.13"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
-access_control = { workspace = true }
-analytics = { workspace = true }
+checkin = { workspace = true }
 events = { workspace = true }
+finance = { workspace = true }
 identity = { workspace = true }
 libs = { workspace = true }
 notifications = { workspace = true }
-orders = { workspace = true }
+organizers = { workspace = true }
 payments = { workspace = true }
+reporting = { workspace = true }
+sales = { workspace = true }
 shared = { workspace = true }
+ticketing = { workspace = true }
 
 [tool.uv.workspace]
 # https://docs.astral.sh/uv/concepts/projects/workspaces/
@@ -75,6 +82,7 @@ markers = [
 [tool.ruff]
 required-version = ">=0.8.0" # this is the version included with vscode extension
 line-length = 120
+target-version = "py314"
 # Explicitly set the source to the current directory.
 # When other configurations `extend` this one, they'll
 # use _this_ directory as `src`.

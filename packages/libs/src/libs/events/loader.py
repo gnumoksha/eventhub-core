@@ -11,9 +11,7 @@ def _load_item(item: str | types.ModuleType, filename: str) -> None:
         importlib.import_module(item)
         return
 
-    for _, module_name, _ in pkgutil.walk_packages(
-        item.__path__, item.__name__ + "."
-    ):
+    for _, module_name, _ in pkgutil.walk_packages(item.__path__, item.__name__ + "."):
         if module_name.rsplit(".", 1)[-1] == filename:
             importlib.import_module(module_name)
 

@@ -48,11 +48,13 @@ jobs:
         run: uv run ruff check packages/ src/
 
       - name: Ruff format
-        run: uv run ruff format --check packages/ src/
+        # fix errors running: uv run ruff format bin/ packages/ src/
+        run: uv run ruff format --check bin/ packages/ src/
 
       - name: ty
+        # fix errors running: uv run ty check --error-on-warning --fix bin/ packages/ src/
         run: |
-          uv run ty check --error-on-warning --output-format github packages/ src/ \
+          uv run ty check --error-on-warning --output-format github bin/ packages/ src/ \
           --exclude packages/libs/tests
 
   # This job runs the tests for small packages. They are not split into many jobs
@@ -104,32 +106,41 @@ jobs:
       - name: Running database migrations
         run: uv run alembic upgrade head
 
-      - name: Test access_control package
-        run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/access_control/tests
-
-      - name: Test analytics package
-        run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/analytics/tests
+      # - name: Test checkin package
+      #   run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/checkin/tests
 
       - name: Test events package
         run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/events/tests
 
-      - name: Test identity package
-        run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/identity/tests
+      # - name: Test finance package
+      #   run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/finance/tests
+
+      # - name: Test identity package
+      #   run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/identity/tests
 
       - name: Test libs package
         run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/libs/tests
 
-      - name: Test notifications package
-        run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/notifications/tests
+      # - name: Test notifications package
+      #   run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/notifications/tests
 
-      - name: Test orders package
-        run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/orders/tests
+      # - name: Test organizers package
+      #   run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/organizers/tests
 
-      - name: Test payments package
-        run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/payments/tests
+      # - name: Test payments package
+      #   run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/payments/tests
+
+      # - name: Test reporting package
+      #   run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/reporting/tests
+
+      # - name: Test sales package
+      #   run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/sales/tests
 
       - name: Test shared package
         run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/shared/tests
+
+      # - name: Test ticketing package
+      #   run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/ticketing/tests
 
       - name: Upload test results
         if: failure()

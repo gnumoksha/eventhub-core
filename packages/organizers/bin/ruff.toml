@@ -1,0 +1,6 @@
+extend = "../pyproject.toml"
+
+[lint]
+ignore = [
+    "T201", # print statement
+]
