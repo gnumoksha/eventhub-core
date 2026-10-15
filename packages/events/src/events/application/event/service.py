@@ -105,8 +105,8 @@ class EventService:
         return len(events)
 
 
-def __get_repository(repo: EventRepositoryDep) -> EventService:
+def __get_service(repo: EventRepositoryDep) -> EventService:
     return EventService(repo)
 
 
-EventServiceDep = Annotated[EventService, Depends(__get_repository)]
+EventServiceDep = Annotated[EventService, Depends(__get_service)]
