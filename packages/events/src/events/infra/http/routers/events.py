@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
+from events.application.event.service import EventServiceDep
 from events.application.event.values import (
     CancelEventInput,
     CreateEventInput,
@@ -12,7 +13,6 @@ from events.application.event.values import (
     VenueSchema,
 )
 from events.domain.models.event.values import EventID, EventStatus
-from events.infra.http.dependencies import EventServiceDep
 
 # TODO require authentication and check that the account is a member of the event's organization
 router = APIRouter(tags=["events"])
