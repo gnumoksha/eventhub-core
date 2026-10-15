@@ -1,6 +1,9 @@
 from datetime import datetime
+from typing import Annotated
 
 from shared.domain.errors import ConcurrencyConflict
+from shared.infra.database import SessionDep
+from shared.infra.di import Depends
 from shared.infra.outbox import add_to_outbox
 from sqlalchemy.orm.exc import StaleDataError
 from sqlmodel import Session, col, select
@@ -62,3 +65,10 @@ class EventRepository:
             .limit(limit)
         )
         return list(self._session.exec(query).all())
+
+
+def __get_repository(session: SessionDep) -> EventRepository:
+    return EventRepository(session)
+
+
+EventRepositoryDep = Annotated[EventRepository, Depends(__get_repository)]

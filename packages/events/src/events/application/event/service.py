@@ -1,7 +1,10 @@
+from typing import Annotated
+
 from libs.time_utils import Clock, utc_now
+from shared.infra.di import Depends
 
 from events.domain.models.event.event import Event
-from events.domain.models.event.repository import EventRepository
+from events.domain.models.event.repository import EventRepository, EventRepositoryDep
 from events.domain.models.event.values import AgeRating, EventID, EventPeriod, EventStatus, OrganizationID, Venue
 
 
@@ -100,3 +103,10 @@ class EventService:
             event.finish(now)
             self._repository.save(event)
         return len(events)
+
+
+def __get_repository(repo: EventRepositoryDep) -> EventService:
+    return EventService(repo)
+
+
+EventServiceDep = Annotated[EventService, Depends(__get_repository)]

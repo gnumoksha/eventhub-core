@@ -5,7 +5,7 @@ from shared.settings import settings
 # It is necessary because python needs to load the decorators.
 to_include = [
     "identity.application.accounts.tasks",
-    "events.infra.tasks",
+    "events.application.event.tasks",
 ]
 
 if settings.is_test():

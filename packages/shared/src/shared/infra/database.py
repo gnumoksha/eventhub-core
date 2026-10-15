@@ -32,18 +32,6 @@ def get_session():
         yield session
 
 
-def get_static_session() -> Session:
-    """
-    Workaround to get the session without using the FastAPI dependency injection.
-    This is useful inside places where I don't know how to use the get_session().
-
-    expire_on_commit=False prevents SQLAlchemy from expiring objects after commit(),
-    which is necessary because LangChain tools run in ThreadPoolExecutor and need
-    to access model attributes after commits happen elsewhere in the request.
-    """
-    return Session(engine, expire_on_commit=False)
-
-
 SessionDep = Annotated[Session, Depends(get_session)]
 
 
