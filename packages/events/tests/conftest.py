@@ -27,17 +27,17 @@ class InMemoryEventRepository(EventRepository):
         self.outbox: list[PublishableEvent] = []
 
     @override
-    def get(self, id: EventID) -> Event | None:
+    async def get(self, id: EventID) -> Event | None:
         return self.events.get(id)
 
     @override
-    def save(self, event: Event) -> None:
+    async def save(self, event: Event) -> None:
         event.version += 1
         self.events[event.id] = event
         self.outbox.extend(event.pull_events())
 
     @override
-    def list_by_organization(
+    async def list_by_organization(
         self,
         organization_id: OrganizationID,
         *,
@@ -53,7 +53,7 @@ class InMemoryEventRepository(EventRepository):
         return events[offset : offset + limit]
 
     @override
-    def list_ended_but_not_finished(self, now: datetime, *, limit: int) -> list[Event]:
+    async def list_ended_but_not_finished(self, now: datetime, *, limit: int) -> list[Event]:
         return [
             e
             for e in self.events.values()

@@ -5,34 +5,37 @@ from typing import Annotated
 import uuid_utils.compat as uuid_compat
 from shared.infra.di import Depends
 from shared.settings import settings
-from sqlmodel import Field, Session, SQLModel, create_engine
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlmodel import Field, SQLModel
 
 # A SQLModel engine (underneath it's actually a SQLAlchemy engine) is what holds the connections to the database.
 # You would have one single engine object for all your code to connect to the same database.
-engine = create_engine(str(settings.DATABASE_URL), pool_pre_ping=True)
+database_url = settings.DATABASE_URL
+async_database_url = make_url(database_url.unicode_string()).set(drivername="postgresql+asyncpg")
+engine = create_async_engine(async_database_url, pool_pre_ping=True)
+SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
 
 
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
+async def create_db_and_tables() -> None:
+    async with engine.begin() as connection:
+        await connection.run_sync(SQLModel.metadata.create_all)
 
 
-def get_session():
+async def get_session():
     """
-    A Session is what stores the objects in memory and keeps track of any
-    changes needed in the data, then it uses the engine to communicate with the database.
+    An AsyncSession tracks changes to the data and communicates with the database.
 
     We will create a FastAPI dependency with yield that will provide a new
     Session for each request. This is what ensures that we use a single session per request.
 
-    expire_on_commit=False prevents SQLAlchemy from expiring objects after commit(),
-    which is necessary because LangChain tools run in ThreadPoolExecutor and need
-    to access model attributes after commits happen elsewhere in the request.
+    expire_on_commit=False keeps loaded attributes available after a commit.
     """
-    with Session(engine, expire_on_commit=False) as session:
+    async with SessionFactory() as session:
         yield session
 
 
-SessionDep = Annotated[Session, Depends(get_session)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 class HasUUID4AsPrimaryKey:

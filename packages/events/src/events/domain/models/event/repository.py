@@ -5,21 +5,22 @@ from shared.domain.errors import ConcurrencyConflict
 from shared.infra.database import SessionDep
 from shared.infra.di import Depends
 from shared.infra.outbox import add_to_outbox
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
-from sqlmodel import Session, col, select
+from sqlmodel import col, select
 
 from events.domain.models.event.event import Event
 from events.domain.models.event.values import EventID, EventStatus, OrganizationID
 
 
 class EventRepository:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    def get(self, id: EventID) -> Event | None:
-        return self._session.get(Event, id)
+    async def get(self, id: EventID) -> Event | None:
+        return await self._session.get(Event, id)
 
-    def save(self, event: Event) -> None:
+    async def save(self, event: Event) -> None:
         """
         Inserts or updates the event and, in the same transaction, stores its
         pending integration events to be published.
@@ -33,12 +34,12 @@ class EventRepository:
         add_to_outbox(self._session, event.pull_events())
 
         try:
-            self._session.commit()
+            await self._session.commit()
         except StaleDataError as exc:
-            self._session.rollback()
+            await self._session.rollback()
             raise ConcurrencyConflict(f"Event {event_id} was modified by someone else") from exc
 
-    def list_by_organization(
+    async def list_by_organization(
         self,
         organization_id: OrganizationID,
         *,
@@ -51,9 +52,10 @@ class EventRepository:
             query = query.where(Event.status == status)
         query = query.order_by(col(Event.start_at).desc().nulls_first(), col(Event.id).desc())
 
-        return list(self._session.exec(query.offset(offset).limit(limit)).all())
+        result = await self._session.execute(query.offset(offset).limit(limit))
+        return list(result.scalars().all())
 
-    def list_ended_but_not_finished(self, now: datetime, *, limit: int) -> list[Event]:
+    async def list_ended_but_not_finished(self, now: datetime, *, limit: int) -> list[Event]:
         """Returns published or postponed events whose period already ended."""
         query = (
             select(Event)
@@ -64,10 +66,11 @@ class EventRepository:
             .order_by(col(Event.end_at))
             .limit(limit)
         )
-        return list(self._session.exec(query).all())
+        result = await self._session.execute(query)
+        return list(result.scalars().all())
 
 
-def __get_repository(session: SessionDep) -> EventRepository:
+async def __get_repository(session: SessionDep) -> EventRepository:
     return EventRepository(session)
 
 

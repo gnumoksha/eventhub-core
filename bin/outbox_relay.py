@@ -6,8 +6,8 @@ Run it with: uv run python -m bin.outbox_relay
 Many instances can run at the same time: each message is locked while it is published.
 """
 
+import asyncio
 import signal
-import time
 from types import FrameType
 
 import checkin
@@ -46,7 +46,7 @@ class _StopSignal:
 
 
 @injectable
-def main(dispatcher: QueueDispatcherDep, session: SessionDep) -> None:
+async def main(dispatcher: QueueDispatcherDep, session: SessionDep) -> None:
     # the relay rebuilds the events from the outbox, so it must know every event class
     for context in CONTEXTS:
         load_events(context)
@@ -56,14 +56,14 @@ def main(dispatcher: QueueDispatcherDep, session: SessionDep) -> None:
 
     relay = OutboxRelay(session, dispatcher)
     while not stop.received:
-        published = relay.relay()
+        published = await relay.relay()
 
         # nothing pending or the broker is down: wait before polling again
         if published == 0:
-            time.sleep(IDLE_SLEEP_SECONDS)
+            await asyncio.sleep(IDLE_SLEEP_SECONDS)
 
     logger.info("Outbox relay stopped")
 
 
 if __name__ == "__main__":
-    main()  # ty:ignore[missing-argument]
+    asyncio.run(main())  # ty:ignore[missing-argument]

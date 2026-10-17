@@ -22,7 +22,8 @@ from libs.events.encoding import UnmappedEventError
 from shared.infra.logger import logger
 from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlmodel import Field, Session, SQLModel, col, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import Field, SQLModel, col, select
 
 _ERROR_MAX_LENGTH = 2000
 
@@ -62,53 +63,53 @@ class OutboxMessage(SQLModel, table=True):
         return JsonDecoder().decode(json.dumps(self.message))
 
 
-def add_to_outbox(session: Session, events: Iterable[PublishableEvent]) -> None:
+def add_to_outbox(session: AsyncSession, events: Iterable[PublishableEvent]) -> None:
     """Stages the events in the session. They are persisted by the caller's commit."""
     session.add_all(OutboxMessage.from_event(event) for event in events)
 
 
 class OutboxRelay:
-    def __init__(self, session: Session, dispatcher: Dispatcher) -> None:
+    def __init__(self, session: AsyncSession, dispatcher: Dispatcher) -> None:
         self._session = session
         self._dispatcher = dispatcher
 
-    def relay(self, *, batch_size: int = 100) -> int:
+    async def relay(self, *, batch_size: int = 100) -> int:
         """
         Publishes up to batch_size pending messages, oldest first. Returns how many were published.
 
         Stops at the first dispatch failure (e.g. broker down) so that messages keep their order.
         """
         try:
-            return self._relay(batch_size)
+            return await self._relay(batch_size)
         finally:
             # never leave a transaction open between calls: it would hold locks (blocking migrations) and block vacuum
-            self._session.rollback()
+            await self._session.rollback()
 
-    def _relay(self, batch_size: int) -> int:
+    async def _relay(self, batch_size: int) -> int:
         published = 0
         while published < batch_size:
-            message = self._claim_next()
+            message = await self._claim_next()
             if message is None:
                 break
 
             try:
                 self._dispatcher.dispatch(message.to_event())
             except EventDispatchError as exc:
-                self._record_failure(message, exc)
+                await self._record_failure(message, exc)
                 break
             except UnmappedEventError as exc:
                 # it will never succeed until the code is fixed, so it must not block the next messages
-                self._record_failure(message, exc, give_up=True)
+                await self._record_failure(message, exc, give_up=True)
                 continue
 
             message.published_at = datetime.now(UTC)
             message.attempts += 1
-            self._session.commit()
+            await self._session.commit()
             published += 1
 
         return published
 
-    def _claim_next(self) -> OutboxMessage | None:
+    async def _claim_next(self) -> OutboxMessage | None:
         """Locks the oldest pending message so that concurrent relays skip it."""
         query = (
             select(OutboxMessage)
@@ -117,12 +118,13 @@ class OutboxRelay:
             .limit(1)
             .with_for_update(skip_locked=True)
         )
-        return self._session.exec(query).first()
+        result = await self._session.execute(query)
+        return result.scalars().first()
 
-    def _record_failure(self, message: OutboxMessage, exc: Exception, *, give_up: bool = False) -> None:
+    async def _record_failure(self, message: OutboxMessage, exc: Exception, *, give_up: bool = False) -> None:
         logger.exception("Could not publish outbox message %s (%s)", message.id, message.event_name)
         message.attempts += 1
         message.last_error = str(exc)[:_ERROR_MAX_LENGTH]
         if give_up:
             message.discarded_at = datetime.now(UTC)
-        self._session.commit()
+        await self._session.commit()
