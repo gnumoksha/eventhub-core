@@ -30,7 +30,9 @@ async def test_create_persists_a_draft(service: EventService, repository: InMemo
     assert event.status == EventStatus.DRAFT
 
 
-async def test_publish_stores_integration_event_in_the_outbox(service: EventService, repository: InMemoryEventRepository):
+async def test_publish_stores_integration_event_in_the_outbox(
+    service: EventService, repository: InMemoryEventRepository
+):
     event = await create_draft(service)
 
     await service.publish(event.id)
@@ -51,7 +53,9 @@ async def test_list_by_organization_filters_by_status(service: EventService):
     await create_draft(service)  # another organization
 
     assert {e.id for e in await service.list_by_organization(organization_id)} == {draft.id, published.id}
-    assert [e.id for e in await service.list_by_organization(organization_id, status=EventStatus.PUBLISHED)] == [published.id]
+    assert [e.id for e in await service.list_by_organization(organization_id, status=EventStatus.PUBLISHED)] == [
+        published.id
+    ]
 
 
 async def test_finish_ended_events(service: EventService, repository: InMemoryEventRepository, clock: FakeClock):

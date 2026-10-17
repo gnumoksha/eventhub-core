@@ -49,7 +49,9 @@ async def get_event(event_id: EventID, service: EventServiceDep) -> EventOutput:
 
 
 @router.put("/events/{event_id}/details")
-async def update_event_details(event_id: EventID, input_: UpdateEventDetailsInput, service: EventServiceDep) -> EventOutput:
+async def update_event_details(
+    event_id: EventID, input_: UpdateEventDetailsInput, service: EventServiceDep
+) -> EventOutput:
     event = await service.update_details(
         event_id,
         title=input_.title,

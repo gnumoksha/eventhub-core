@@ -144,7 +144,10 @@ async def test_stores_integration_events_in_the_outbox(repository: EventReposito
 
 
 async def test_concurrency_conflict_does_not_store_integration_events(
-    repository: EventRepository, concurrent_repository: EventRepository, concurrent_session: AsyncSession, session: AsyncSession
+    repository: EventRepository,
+    concurrent_repository: EventRepository,
+    concurrent_session: AsyncSession,
+    session: AsyncSession,
 ):
     event = make_draft()
     event.publish(NOW)

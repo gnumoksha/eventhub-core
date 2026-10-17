@@ -43,7 +43,9 @@ async def session() -> AsyncIterator[AsyncSession]:
     """
     async with engine.connect() as connection:
         transaction = await connection.begin()
-        async with AsyncSession(bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False) as session:
+        async with AsyncSession(
+            bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False
+        ) as session:
             # hide the messages that were pending before the test
             await session.execute(
                 update(OutboxMessage)
