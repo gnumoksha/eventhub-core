@@ -6,20 +6,18 @@ repo_root="$(cd -- "$script_dir/.." && pwd)"
 deploy_dir="$repo_root/var/kubernetes/production"
 secrets_file="$deploy_dir/app-secrets.env"
 kustomization_file="$deploy_dir/kustomization.yaml"
-package_versions_endpoint="/users/gnumoksha/packages/container/eventhub-core/versions?per_page=100"
+registry_repository="gnumoksha/eventhub-core"
+registry_image="ghcr.io/$registry_repository"
+registry_token_url="https://ghcr.io/token?scope=repository%3A${registry_repository//\//%2F}%3Apull"
+registry_manifest_url="https://ghcr.io/v2/$registry_repository/manifests/latest"
 rollout_timeout="${ROLLOUT_TIMEOUT:-5m}"
 
-for command in kubectl gh jq python3; do
+for command in kubectl curl jq python3; do
   if ! command -v "$command" >/dev/null 2>&1; then
     printf 'Error: %s is required but was not found in PATH.\n' "$command" >&2
     exit 1
   fi
 done
-
-if ! gh auth status >/dev/null 2>&1; then
-  printf 'Error: authenticate with GitHub CLI first (gh auth login).\n' >&2
-  exit 1
-fi
 
 if [[ ! -f "$secrets_file" ]]; then
   printf 'Error: secrets file not found: %s\n' "$secrets_file" >&2
@@ -32,28 +30,45 @@ if grep -Eqi 'replace-with|change-me|todo' "$secrets_file"; then
   exit 1
 fi
 
-image_tag="$(gh api --paginate "$package_versions_endpoint" | jq -rs '[add[] | select((.metadata.container.tags // []) | any(startswith("sha-")))] | sort_by(.created_at) | last | (.metadata.container.tags[]? | select(startswith("sha-")))')"
-if [[ ! "$image_tag" =~ ^sha-[[:xdigit:]]{7,40}$ ]]; then
-  printf 'Error: could not find a valid sha-* image tag in GitHub Container Registry.\n' >&2
+# Get the latest image digest for the main branch
+registry_token="$(curl --fail --silent --show-error --location "$registry_token_url" \
+  | jq -er 'if type == "object" and (.token | type == "string" and length > 0) then .token else error("GHCR token response does not contain a token") end')"
+image_digest="$(curl --fail --silent --show-error --location \
+  --output /dev/null \
+  --dump-header - \
+  --header "Authorization: Bearer $registry_token" \
+  --header 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json' \
+  "$registry_manifest_url" \
+  | awk '
+      tolower($1) == "docker-content-digest:" { gsub("\\r", "", $2); digest = $2 }
+      END { if (digest != "") print digest }
+    ')"
+if [[ ! "$image_digest" =~ ^sha256:[[:xdigit:]]{64}$ ]]; then
+  printf 'Error: could not resolve a valid image digest from the public GHCR latest tag (received: %q).\n' "$image_digest" >&2
   exit 1
 fi
 
-python3 - "$kustomization_file" "$image_tag" <<'PY'
+# update the kustomization.yaml with the image digest
+python3 - "$kustomization_file" "$image_digest" <<'PY'
 from pathlib import Path
 import re
 import sys
 
 path = Path(sys.argv[1])
-tag = sys.argv[2]
+digest = sys.argv[2]
 contents = path.read_text()
-updated, count = re.subn(r"(?m)^([ \t]*newTag:[ \t]*).+$", rf"\g<1>{tag}", contents)
+updated, count = re.subn(
+    r"(?m)^([ \t]*)(?:newTag|digest):[ \t]*.+$",
+    rf"\g<1>digest: {digest}",
+    contents,
+)
 if count != 1:
-    raise SystemExit(f"Error: expected one newTag entry in {path}, found {count}.")
+    raise SystemExit(f"Error: expected one newTag or digest entry in {path}, found {count}.")
 path.write_text(updated)
 PY
 
 context="$(kubectl config current-context)"
-printf 'Deploying image tag %s to Kubernetes context: %s\n' "$image_tag" "$context"
+printf 'Deploying image %s@%s to Kubernetes context: %s\n' "$registry_image" "$image_digest" "$context"
 
 kubectl apply -k "$deploy_dir"
 

@@ -25,4 +25,4 @@ images:
   - name: ghcr.io/gnumoksha/eventhub-core
     # https://github.com/gnumoksha/eventhub-core/pkgs/container/eventhub-core
     # newTag: latest
-    newTag: sha-f00b8a0
+    digest: sha256:f070a13c504fa99924c382e6c03ea0c0b04aff03d4ce543e8612d9095de75aa7
