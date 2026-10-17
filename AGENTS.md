@@ -1,4 +1,4 @@
 - Do not create an abstract repository if only one implementation exists because it is harder for a LLM to find it.
 - Do not split the domain entity and its infrastructure implementation to avoid complexity and because it is harder for a LLM to find it.
 - Use uuid v7 to create an UUID (as it is more performant), except if specified otherwise.
-- Run all commands inside a docker container, like in: `docker compose exec app-web ls`
+- Run uv, pytest, ruff and ty inside a docker container, like in: `docker compose exec app-web uv run pytest packages/libs`
