@@ -40,8 +40,11 @@ class Metadata:
         occurred_on: datetime | None = None,
     ) -> None:
         self._schema_version = schema_version
-        self._id = id or uuid_compat.uuid7()
-        self._occurred_on = occurred_on or datetime.now(UTC)
+        self._id = id if id is not None else uuid_compat.uuid7()
+        occurred_on = occurred_on if occurred_on is not None else datetime.now(UTC)
+        if occurred_on.tzinfo is None or occurred_on.utcoffset() is None:
+            raise ValueError("occurred_on must include a timezone")
+        self._occurred_on = occurred_on.astimezone(UTC)
 
     @property
     def id(self) -> uuid.UUID:
@@ -115,10 +118,13 @@ class PublishableEvent(ABC):
         """
         super().__init_subclass__(**kwargs)
 
-        if len(name) == 0:
+        if not name.strip():
             raise ValueError("Event name can not be empty")
         if len(name) > cls.NAME_MAX_LENGTH:
             raise ValueError("Event name must be up to 200 characters long")
+
+        if name in PublishableEvent._registry:
+            raise ValueError(f'Event name "{name}" is already registered')
 
         cls.NAME = name
         PublishableEvent._registry[name] = cls
