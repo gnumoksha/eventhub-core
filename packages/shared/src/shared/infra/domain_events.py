@@ -85,7 +85,7 @@ def declare_events_topology(channel: BlockingChannel) -> None:
         durable=True,
         arguments={
             "x-queue-type": "quorum",
-            "x-dead-letter-exchange": domain_events_config.exchange,
+            "x-dead-letter-exchange": exchange_dlx_name,
             # do not store many messages in memory to avoid running out of memory
             "x-max-in-memory-length": 1000,
         },

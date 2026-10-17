@@ -271,4 +271,4 @@ class TestRabbitMQGracefulConsumer:
 
         consumer.stop()
         mock_channel.stop_consuming.assert_called_once()
-        mock_pika_conn.close.assert_called_once()
+        mock_conn.close.assert_called_once()

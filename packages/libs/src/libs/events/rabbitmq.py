@@ -8,7 +8,7 @@ from pika import BlockingConnection, DeliveryMode
 from pika.adapters.blocking_connection import (
     BlockingChannel,
 )
-from pika.exceptions import AMQPConnectionError
+from pika.exceptions import AMQPConnectionError, NackError, UnroutableError
 from pika.spec import Basic, BasicProperties
 
 from .consumer import Consumer
@@ -39,7 +39,7 @@ class RabbitMQConnection:
         self._name = connection_name
         self._blocked_timeout_seconds = blocked_timeout_seconds
         self._listeners_on_channel: list[ChannelListener] = []
-        self._connection: BlockingChannel | None = None
+        self._connection: BlockingConnection | None = None
         self._channel: BlockingChannel | None = None
         self._channel_reset = False
 
@@ -57,11 +57,15 @@ class RabbitMQConnection:
             if self._name:
                 params.client_properties["connection_name"] = self._name  # type:ignore
 
-            self._connection = pika.BlockingConnection(params)  # type:ignore
+            self._connection = pika.BlockingConnection(params)
 
-        return self._connection  # type:ignore
+        return self._connection
 
     def reset_connection(self) -> None:
+        self.reset_channel()  # channel is attached to the connection
+
+        if self._connection is not None and self._connection.is_open:
+            self._connection.close()
         self._connection = None
 
     def channel(self) -> BlockingChannel:
@@ -76,8 +80,13 @@ class RabbitMQConnection:
         return self._channel
 
     def reset_channel(self) -> None:
+        if self._channel is not None and self._channel.is_open:
+            self._channel.close()
         self._channel = None
         self._channel_reset = True
+
+    def close(self) -> None:
+        self.reset_connection()
 
 
 class RabbitMQDispatcher(Dispatcher):
@@ -88,12 +97,15 @@ class RabbitMQDispatcher(Dispatcher):
     ) -> None:
         self._connection = connection
         self._encoder = encoder
+        self._confirmed_channel: BlockingChannel | None = None
 
     @override
     def dispatch(self, event: PublishableEvent) -> None:
         try:
             self._publish(event)
             return
+        except (NackError, UnroutableError) as exc:
+            raise EventDispatchError(f'RabbitMQ rejected event "{event.NAME}"') from exc
         except AMQPConnectionError, OSError:
             # pika does not always wrap socket failures (e.g. DNS resolution) in AMQPConnectionError
             logger.exception(
@@ -104,11 +116,19 @@ class RabbitMQDispatcher(Dispatcher):
 
         try:
             self._publish(event)
+        except (NackError, UnroutableError) as exc:
+            raise EventDispatchError(f'RabbitMQ rejected event "{event.NAME}" after reconnecting') from exc
         except (AMQPConnectionError, OSError) as exc:
             raise EventDispatchError(f'Failed to dispatch event "{event.NAME}" after reconnecting') from exc
 
     def _publish(self, event: PublishableEvent) -> None:
-        self._connection.channel().basic_publish(
+        channel = self._connection.channel()
+        # Publisher confirms let basic_publish report broker-side nacks and
+        # unroutable messages instead of treating a socket write as success.
+        if channel is not self._confirmed_channel:
+            channel.confirm_delivery()
+            self._confirmed_channel = channel
+        confirmed = channel.basic_publish(
             exchange=event.config.exchange,
             # The meaning of a binding key depends on the exchange type.
             #  - fanout = simply ignored its value.
@@ -128,6 +148,8 @@ class RabbitMQDispatcher(Dispatcher):
                 delivery_mode=DeliveryMode.Persistent,
             ),
         )
+        if confirmed is False:
+            raise EventDispatchError(f'RabbitMQ did not confirm event "{event.NAME}"')
 
 
 class RabbitMQGracefulConsumer(Consumer):
@@ -143,8 +165,6 @@ class RabbitMQGracefulConsumer(Consumer):
         self._connection = connection
         self._decoder = decoder
         self._dispatcher = dispatcher
-        self._connection = connection
-
         self._channel = self._connection.channel()
         self._channel.basic_qos(prefetch_count=1)
         self._channel.basic_consume(
@@ -152,10 +172,6 @@ class RabbitMQGracefulConsumer(Consumer):
             on_message_callback=self.on_message,
             auto_ack=False,
         )
-
-        # Register signals for container stop (SIGTERM) and ctrl-c (SIGINT)
-        signal.signal(signal.SIGTERM, self.exit_gracefully)
-        signal.signal(signal.SIGINT, self.exit_gracefully)
 
     def on_message(
         self,
@@ -167,7 +183,11 @@ class RabbitMQGracefulConsumer(Consumer):
         try:
             event = self._decoder.decode(body)
         except Exception:  # noqa: BLE001
-            logger.exception("Failed to decode the event. Body: %s", body)
+            logger.exception(
+                "Failed to decode event delivery %s (body size: %d bytes)",
+                method.delivery_tag,
+                len(body),
+            )
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)  # ty:ignore[invalid-argument-type]
             return
 
@@ -187,19 +207,25 @@ class RabbitMQGracefulConsumer(Consumer):
         ch.basic_ack(delivery_tag=method.delivery_tag)  # ty:ignore[invalid-argument-type]
 
     def exit_gracefully(self, signum: int, frame: FrameType | None) -> None:  # noqa: ARG002
-        print("Received shutdown signal, stopping consumer...")  # noqa: T201
-        # Use add_callback_threadsafe if breaking from another thread,
-        # or stop consuming directly on the blocking connection
-        self._connection.connection().add_callback_threadsafe(self.stop)
+        logger.info("Received shutdown signal %s; stopping consumer", signum)
+        connection = self._connection.connection()
+        if connection.is_open:
+            connection.add_callback_threadsafe(self.stop)
 
     @override
     def start(self) -> None:
-        self._channel.start_consuming()
+        # Signal handlers are process-wide and can only be installed from the
+        # main thread, so do it when the consumer actually starts.
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+
+        try:
+            self._channel.start_consuming()
+        finally:
+            self.stop()
 
     @override
     def stop(self) -> None:
-        if self._connection.channel().is_open:
+        if self._channel.is_open:
             self._channel.stop_consuming()
-
-        if self._connection.connection().is_open:
-            self._connection.connection().close()
+        self._connection.close()

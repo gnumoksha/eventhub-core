@@ -28,6 +28,10 @@ class UnmappedEventError(Exception):
         super().__init__(f"Event {event_name} does not have a mapped event class. Did you called load_events() before?")
 
 
+class EventDecodeError(ValueError):
+    """Raised when a message does not match the event envelope format."""
+
+
 class Decoder(ABC):
     @abstractmethod
     def decode(self, data: str | bytes) -> PublishableEvent:
@@ -41,10 +45,17 @@ class Decoder(ABC):
 class JsonDecoder(Decoder):
     @override
     def decode(self, data: str | bytes) -> PublishableEvent:
-        decoded = json.loads(data)
-        event_name = decoded["name"]
-        metadata = Metadata.from_dict(decoded["metadata"])
-        payload = decoded["payload"]
+        try:
+            decoded = json.loads(data)
+            if not isinstance(decoded, dict):
+                raise TypeError("event envelope must be a JSON object")
+            event_name = decoded["name"]
+            metadata = Metadata.from_dict(decoded["metadata"])
+            payload = decoded["payload"]
+            if not isinstance(event_name, str) or not isinstance(payload, dict):
+                raise TypeError("'name' must be a string and 'payload' must be an object")
+        except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            raise EventDecodeError("Message is not a valid event envelope") from exc
 
         try:
             event_cls = PublishableEvent.for_name(event_name)
