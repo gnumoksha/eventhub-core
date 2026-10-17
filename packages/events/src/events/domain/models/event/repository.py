@@ -5,8 +5,8 @@ from shared.domain.errors import ConcurrencyConflict
 from shared.infra.database import SessionDep
 from shared.infra.di import Depends
 from shared.infra.outbox import add_to_outbox
-from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.exc import StaleDataError
 from sqlmodel import col, select
 
 from events.domain.models.event.event import Event
