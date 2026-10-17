@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: production
+
+resources:
+  - namespace.yaml
+  - app-config.yaml
+  - postgresql.yaml
+  - redis.yaml
+  - rabbitmq.yaml
+  - eventhub.yaml
+  - workers/outbox-relay.yaml
+  - cronjobs/finish-ended-events.yaml
+
+secretGenerator:
+  - name: app-secrets
+    envs:
+      - app-secrets.env
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+images:
+  - name: ghcr.io/gnumoksha/eventhub-core
+    # https://github.com/gnumoksha/eventhub-core/pkgs/container/eventhub-core
+    # newTag: latest
+    newTag: sha-f00b8a0
