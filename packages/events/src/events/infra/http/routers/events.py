@@ -19,8 +19,8 @@ router = APIRouter(tags=["events"])
 
 
 @router.post("/organizations/{organization_id}/events", status_code=status.HTTP_201_CREATED)
-def create_event(organization_id: uuid.UUID, input_: CreateEventInput, service: EventServiceDep) -> EventOutput:
-    event = service.create(
+async def create_event(organization_id: uuid.UUID, input_: CreateEventInput, service: EventServiceDep) -> EventOutput:
+    event = await service.create(
         organization_id=organization_id,
         title=input_.title,
         description=input_.description,
@@ -32,25 +32,25 @@ def create_event(organization_id: uuid.UUID, input_: CreateEventInput, service: 
 
 
 @router.get("/organizations/{organization_id}/events")
-def list_organization_events(
+async def list_organization_events(
     organization_id: uuid.UUID,
     service: EventServiceDep,
     status_: Annotated[EventStatus | None, Query(alias="status")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[EventOutput]:
-    events = service.list_by_organization(organization_id, status=status_, limit=limit, offset=offset)
+    events = await service.list_by_organization(organization_id, status=status_, limit=limit, offset=offset)
     return [EventOutput.from_domain(event) for event in events]
 
 
 @router.get("/events/{event_id}")
-def get_event(event_id: EventID, service: EventServiceDep) -> EventOutput:
-    return EventOutput.from_domain(service.get(event_id))
+async def get_event(event_id: EventID, service: EventServiceDep) -> EventOutput:
+    return EventOutput.from_domain(await service.get(event_id))
 
 
 @router.put("/events/{event_id}/details")
-def update_event_details(event_id: EventID, input_: UpdateEventDetailsInput, service: EventServiceDep) -> EventOutput:
-    event = service.update_details(
+async def update_event_details(event_id: EventID, input_: UpdateEventDetailsInput, service: EventServiceDep) -> EventOutput:
+    event = await service.update_details(
         event_id,
         title=input_.title,
         description=input_.description,
@@ -60,25 +60,25 @@ def update_event_details(event_id: EventID, input_: UpdateEventDetailsInput, ser
 
 
 @router.put("/events/{event_id}/venue")
-def change_event_venue(event_id: EventID, input_: VenueSchema, service: EventServiceDep) -> EventOutput:
-    return EventOutput.from_domain(service.change_venue(event_id, input_.to_domain()))
+async def change_event_venue(event_id: EventID, input_: VenueSchema, service: EventServiceDep) -> EventOutput:
+    return EventOutput.from_domain(await service.change_venue(event_id, input_.to_domain()))
 
 
 @router.put("/events/{event_id}/period")
-def schedule_event(event_id: EventID, input_: PeriodSchema, service: EventServiceDep) -> EventOutput:
-    return EventOutput.from_domain(service.schedule(event_id, input_.to_domain()))
+async def schedule_event(event_id: EventID, input_: PeriodSchema, service: EventServiceDep) -> EventOutput:
+    return EventOutput.from_domain(await service.schedule(event_id, input_.to_domain()))
 
 
 @router.post("/events/{event_id}/publish")
-def publish_event(event_id: EventID, service: EventServiceDep) -> EventOutput:
-    return EventOutput.from_domain(service.publish(event_id))
+async def publish_event(event_id: EventID, service: EventServiceDep) -> EventOutput:
+    return EventOutput.from_domain(await service.publish(event_id))
 
 
 @router.post("/events/{event_id}/postpone")
-def postpone_event(event_id: EventID, input_: PeriodSchema, service: EventServiceDep) -> EventOutput:
-    return EventOutput.from_domain(service.postpone(event_id, input_.to_domain()))
+async def postpone_event(event_id: EventID, input_: PeriodSchema, service: EventServiceDep) -> EventOutput:
+    return EventOutput.from_domain(await service.postpone(event_id, input_.to_domain()))
 
 
 @router.post("/events/{event_id}/cancel")
-def cancel_event(event_id: EventID, input_: CancelEventInput, service: EventServiceDep) -> EventOutput:
-    return EventOutput.from_domain(service.cancel(event_id, input_.reason))
+async def cancel_event(event_id: EventID, input_: CancelEventInput, service: EventServiceDep) -> EventOutput:
+    return EventOutput.from_domain(await service.cancel(event_id, input_.reason))

@@ -98,12 +98,12 @@ async def http_exception_handler(request: Request, exc: Exception):  # noqa: ARG
 
 
 @app.get("/app-status", dependencies=[Depends(require_private_ip_address)])
-def app_status(
+async def app_status(
     service: AppStatusServiceDep,
     mode: Mode | None = Query("common"),
 ) -> ShowAppStatusOutput:
     input_ = ShowAppStatusInput(mode=mode or "common")
-    return service.execute(input_)
+    return await service.execute(input_)
 
 
 identity_setup_routers(app)

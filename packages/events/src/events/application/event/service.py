@@ -21,7 +21,7 @@ class EventService:
         self._repository = repository
         self._clock = clock
 
-    def create(  # noqa: PLR0913
+    async def create(  # noqa: PLR0913
         self,
         *,
         organization_id: OrganizationID,
@@ -40,16 +40,16 @@ class EventService:
             period=period,
             now=self._clock(),
         )
-        self._repository.save(event)
+        await self._repository.save(event)
         return event
 
-    def get(self, event_id: EventID) -> Event:
-        event = self._repository.get(event_id)
+    async def get(self, event_id: EventID) -> Event:
+        event = await self._repository.get(event_id)
         if event is None:
             raise EventNotFound(event_id)
         return event
 
-    def list_by_organization(
+    async def list_by_organization(
         self,
         organization_id: OrganizationID,
         *,
@@ -57,55 +57,55 @@ class EventService:
         limit: int = 50,
         offset: int = 0,
     ) -> list[Event]:
-        return self._repository.list_by_organization(organization_id, status=status, limit=limit, offset=offset)
+        return await self._repository.list_by_organization(organization_id, status=status, limit=limit, offset=offset)
 
-    def update_details(self, event_id: EventID, *, title: str, description: str, age_rating: AgeRating) -> Event:
-        event = self.get(event_id)
+    async def update_details(self, event_id: EventID, *, title: str, description: str, age_rating: AgeRating) -> Event:
+        event = await self.get(event_id)
         event.update_details(title=title, description=description, age_rating=age_rating, now=self._clock())
-        self._repository.save(event)
+        await self._repository.save(event)
         return event
 
-    def change_venue(self, event_id: EventID, venue: Venue) -> Event:
-        event = self.get(event_id)
+    async def change_venue(self, event_id: EventID, venue: Venue) -> Event:
+        event = await self.get(event_id)
         event.change_venue(venue, self._clock())
-        self._repository.save(event)
+        await self._repository.save(event)
         return event
 
-    def schedule(self, event_id: EventID, period: EventPeriod) -> Event:
-        event = self.get(event_id)
+    async def schedule(self, event_id: EventID, period: EventPeriod) -> Event:
+        event = await self.get(event_id)
         event.schedule(period, self._clock())
-        self._repository.save(event)
+        await self._repository.save(event)
         return event
 
-    def publish(self, event_id: EventID) -> Event:
-        event = self.get(event_id)
+    async def publish(self, event_id: EventID) -> Event:
+        event = await self.get(event_id)
         event.publish(self._clock())
-        self._repository.save(event)
+        await self._repository.save(event)
         return event
 
-    def postpone(self, event_id: EventID, new_period: EventPeriod) -> Event:
-        event = self.get(event_id)
+    async def postpone(self, event_id: EventID, new_period: EventPeriod) -> Event:
+        event = await self.get(event_id)
         event.postpone(new_period, self._clock())
-        self._repository.save(event)
+        await self._repository.save(event)
         return event
 
-    def cancel(self, event_id: EventID, reason: str) -> Event:
-        event = self.get(event_id)
+    async def cancel(self, event_id: EventID, reason: str) -> Event:
+        event = await self.get(event_id)
         event.cancel(reason, self._clock())
-        self._repository.save(event)
+        await self._repository.save(event)
         return event
 
-    def finish_ended_events(self, *, batch_size: int = 100) -> int:
+    async def finish_ended_events(self, *, batch_size: int = 100) -> int:
         """Finishes every event whose period already ended. Returns how many were finished."""
         now = self._clock()
-        events = self._repository.list_ended_but_not_finished(now, limit=batch_size)
+        events = await self._repository.list_ended_but_not_finished(now, limit=batch_size)
         for event in events:
             event.finish(now)
-            self._repository.save(event)
+            await self._repository.save(event)
         return len(events)
 
 
-def __get_service(repo: EventRepositoryDep) -> EventService:
+async def __get_service(repo: EventRepositoryDep) -> EventService:
     return EventService(repo)
 
 
