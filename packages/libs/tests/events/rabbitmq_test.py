@@ -198,7 +198,7 @@ class TestRabbitMQGracefulConsumer:
             on_message_callback=consumer.on_message,
             auto_ack=False,
         )
-        assert mock_signal.call_count == 2
+        mock_signal.assert_not_called()
 
     @patch("libs.events.rabbitmq.signal.signal")
     def test_on_message_success_acks(self, _mock_signal):
@@ -263,12 +263,13 @@ class TestRabbitMQGracefulConsumer:
         mock_pika_conn = MagicMock(is_open=True)
         mock_conn.channel.return_value = mock_channel
         mock_conn.connection.return_value = mock_pika_conn
+        mock_conn.close.side_effect = lambda: setattr(mock_channel, "is_open", False)
 
         consumer = RabbitMQGracefulConsumer(mock_conn, "q", MagicMock(), MagicMock(spec=SyncDispatcher))
 
         consumer.start()
         mock_channel.start_consuming.assert_called_once()
+        assert _mock_signal.call_count == 2
 
-        consumer.stop()
         mock_channel.stop_consuming.assert_called_once()
         mock_conn.close.assert_called_once()

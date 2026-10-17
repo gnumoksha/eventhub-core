@@ -226,6 +226,8 @@ class RabbitMQGracefulConsumer(Consumer):
 
     @override
     def stop(self) -> None:
-        if self._channel.is_open:
-            self._channel.stop_consuming()
-        self._connection.close()
+        try:
+            if self._channel.is_open:
+                self._channel.stop_consuming()
+        finally:
+            self._connection.close()
