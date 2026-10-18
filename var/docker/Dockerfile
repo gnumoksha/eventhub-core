@@ -63,6 +63,8 @@ COPY ./pyproject.toml /app/pyproject.toml
 COPY ./uv.lock /app/uv.lock
 COPY ./src /app/src
 COPY ./packages /app/packages
+COPY ./bin /app/bin
+COPY ./Procfile /app/Procfile
 COPY ./migrations /app/migrations
 COPY ./alembic.ini /app/alembic.ini
 # uv complains about the missing README.md

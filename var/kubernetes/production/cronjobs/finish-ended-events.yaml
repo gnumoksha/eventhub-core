@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finish-ended-events
+  namespace: production
+spec:
+  schedule: "* * * * *" # At every minute https://crontab.guru
+  concurrencyPolicy: Forbid # Don't overlap
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 3 # Retry up to 3 times
+      activeDeadlineSeconds: 120 # Kill after 2 minutes
+      template:
+        spec:
+          containers:
+            - name: finish-ended-events
+              image: ghcr.io/gnumoksha/eventhub-core:latest
+              imagePullPolicy: Always
+              command:
+                ["python", "-m", "packages.events.bin.finish_ended_events"]
+              envFrom:
+                - secretRef:
+                    name: app-secrets
+                - configMapRef:
+                    name: app-config
+              resources:
+                requests:
+                  memory: "100Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+          restartPolicy: OnFailure
