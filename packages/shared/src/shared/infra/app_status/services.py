@@ -20,23 +20,20 @@ class AppStatusService:
         self.session = session
 
     async def execute(self, _input: ShowAppStatusInput) -> ShowAppStatusOutput:
-        global_success = True
-        tested_services = await self.__test_services(_input.mode)
+        overall_success = True
+        tested_services = await self.__test_services() if _input.mode == "full" else {}
         for service in tested_services.values():
             if not service["success"]:
-                global_success = False
+                overall_success = False
                 break
 
         return ShowAppStatusOutput(
-            success=global_success,
+            success=overall_success,
             app=AppOutput(env=self.settings.APP_ENV, version=self.settings.APP_VERSION),
             services=tested_services or None,
         )
 
-    async def __test_services(self, mode: str) -> dict[str, Any]:
-        if mode != "full":
-            return {}
-
+    async def __test_services(self) -> dict[str, Any]:
         return {"database": await self.__test_service(lambda: self.session.execute(text("SELECT 1")))}
 
     async def __test_service(self, func: Callable[[], Awaitable[Any]]) -> dict[str, Any]:
