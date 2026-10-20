@@ -115,8 +115,8 @@ jobs:
       # - name: Test finance package
       #   run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/finance/tests
 
-      # - name: Test identity package
-      #   run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/identity/tests
+      - name: Test identity package
+        run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/identity/tests
 
       - name: Test libs package
         run: uv run pytest -m "not llm_access" --junitxml=tests/report.xml packages/libs/tests

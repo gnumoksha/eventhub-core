@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Query, status
+from identity.infra.http.authentication import CSRFDep, CurrentAccountID
 
 from events.application.event.service import EventServiceDep
 from events.application.event.values import (
@@ -14,12 +15,18 @@ from events.application.event.values import (
 )
 from events.domain.models.event.values import EventID, EventStatus
 
-# TODO require authentication and check that the account is a member of the event's organization
 router = APIRouter(tags=["events"])
+# TODO authorize that the authenticated account belongs to the event's organization.
 
 
 @router.post("/organizations/{organization_id}/events", status_code=status.HTTP_201_CREATED)
-async def create_event(organization_id: uuid.UUID, input_: CreateEventInput, service: EventServiceDep) -> EventOutput:
+async def create_event(
+    organization_id: uuid.UUID,
+    input_: CreateEventInput,
+    service: EventServiceDep,
+    _account_id: CurrentAccountID,
+    _csrf: CSRFDep,
+) -> EventOutput:
     event = await service.create(
         organization_id=organization_id,
         title=input_.title,
@@ -50,7 +57,11 @@ async def get_event(event_id: EventID, service: EventServiceDep) -> EventOutput:
 
 @router.put("/events/{event_id}/details")
 async def update_event_details(
-    event_id: EventID, input_: UpdateEventDetailsInput, service: EventServiceDep
+    event_id: EventID,
+    input_: UpdateEventDetailsInput,
+    service: EventServiceDep,
+    _account_id: CurrentAccountID,
+    _csrf: CSRFDep,
 ) -> EventOutput:
     event = await service.update_details(
         event_id,
@@ -62,25 +73,54 @@ async def update_event_details(
 
 
 @router.put("/events/{event_id}/venue")
-async def change_event_venue(event_id: EventID, input_: VenueSchema, service: EventServiceDep) -> EventOutput:
+async def change_event_venue(
+    event_id: EventID,
+    input_: VenueSchema,
+    service: EventServiceDep,
+    _account_id: CurrentAccountID,
+    _csrf: CSRFDep,
+) -> EventOutput:
     return EventOutput.from_domain(await service.change_venue(event_id, input_.to_domain()))
 
 
 @router.put("/events/{event_id}/period")
-async def schedule_event(event_id: EventID, input_: PeriodSchema, service: EventServiceDep) -> EventOutput:
+async def schedule_event(
+    event_id: EventID,
+    input_: PeriodSchema,
+    service: EventServiceDep,
+    _account_id: CurrentAccountID,
+    _csrf: CSRFDep,
+) -> EventOutput:
     return EventOutput.from_domain(await service.schedule(event_id, input_.to_domain()))
 
 
 @router.post("/events/{event_id}/publish")
-async def publish_event(event_id: EventID, service: EventServiceDep) -> EventOutput:
+async def publish_event(
+    event_id: EventID,
+    service: EventServiceDep,
+    _account_id: CurrentAccountID,
+    _csrf: CSRFDep,
+) -> EventOutput:
     return EventOutput.from_domain(await service.publish(event_id))
 
 
 @router.post("/events/{event_id}/postpone")
-async def postpone_event(event_id: EventID, input_: PeriodSchema, service: EventServiceDep) -> EventOutput:
+async def postpone_event(
+    event_id: EventID,
+    input_: PeriodSchema,
+    service: EventServiceDep,
+    _account_id: CurrentAccountID,
+    _csrf: CSRFDep,
+) -> EventOutput:
     return EventOutput.from_domain(await service.postpone(event_id, input_.to_domain()))
 
 
 @router.post("/events/{event_id}/cancel")
-async def cancel_event(event_id: EventID, input_: CancelEventInput, service: EventServiceDep) -> EventOutput:
+async def cancel_event(
+    event_id: EventID,
+    input_: CancelEventInput,
+    service: EventServiceDep,
+    _account_id: CurrentAccountID,
+    _csrf: CSRFDep,
+) -> EventOutput:
     return EventOutput.from_domain(await service.cancel(event_id, input_.reason))
