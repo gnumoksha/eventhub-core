@@ -27,7 +27,9 @@ PRIVATE_RANGES = [
 async def require_private_ip_address(request: Request):
     """Whether the request is coming from a valid private IP address."""
     try:
-        ip = ipaddress.ip_address(str(request.client.host))  # ty:ignore[unresolved-attribute]
+        if not request.client or not request.client.host:
+            raise ValueError("Host not defined")
+        ip = ipaddress.ip_address(request.client.host)
     except ValueError as e:
         if settings.is_dev_like():
             return

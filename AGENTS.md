@@ -2,3 +2,4 @@
 - Do not split the domain entity and its infrastructure implementation to avoid complexity and because it is harder for a LLM to find it.
 - Use uuid v7 to create an UUID (as it is more performant), except if specified otherwise.
 - Run uv, ruff, ty, alembic and pytest inside a docker container, like in: `docker compose exec app-web uv run pytest packages/libs`
+- If you need to run migrations for the test environment, run: `docker compose exec -T -e APP_ENV=test app-web uv run alembic upgrade head`
