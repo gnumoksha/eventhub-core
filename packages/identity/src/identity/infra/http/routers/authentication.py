@@ -121,8 +121,6 @@ async def signup(
             Email(input_.email),
             Password(input_.password),
         )
-    except InvalidValue as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     except DuplicateAccountEmail:
         pass
     else:
@@ -147,8 +145,6 @@ async def login(
             Password(input_.password),
             client_ip,
         )
-    except InvalidValue as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     except AuthenticationError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password") from exc
 
