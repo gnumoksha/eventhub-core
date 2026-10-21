@@ -12,6 +12,7 @@ The repository is under active development. Its contexts and contracts are organ
 - RabbitMQ for integration events and Redis for tasks such as temporary reservations and login attempt tracking
 - Celery for asynchronous tasks
 - Docker Compose for the local environment
+- Kubernetes for the production environment
 
 ## Architecture
 
