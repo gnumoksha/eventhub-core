@@ -43,12 +43,16 @@ class Settings(BaseSettings):
     LOGGING_LEVEL: str = "INFO"
     PUBLIC_URL: str
 
+    RESEND_API_KEY: SecretStr | None = None
+    NOTIFICATIONS_FROM_EMAIL: str = "Eventhub <no-reply@example.com>"
+
     DATABASE_URL: PostgresDsn
 
     SENTRY_DSN: HttpUrl | None = None
     CORS_ALLOWED_ORIGINS: str
     CORS_ALLOW_ORIGIN_REGEX: str | None = None
 
+    REDIS_DSN: str = "redis://redis:6379/0"
     RABBITMQ_DSN: str = "amqp://eventhub:eventhub@rabbitmq:5672/%2F"
     QUEUE_RESULT_BACKEND_DSN: str = "redis://redis:6379/0"
 

@@ -31,7 +31,6 @@ from shared.infra.http.middlewares.logger import LogMiddleware
 from shared.infra.logger import logger
 from shared.infra.observability.sentry import initialize_sentry
 from shared.settings import settings
-from starlette.middleware.sessions import SessionMiddleware
 from ticketing.infra.http.routers.setup import setup_routers as ticketing_setup_routers
 
 
@@ -62,7 +61,6 @@ app = FastAPI(
 if settings.is_prod():
     # only in production because during development it is hard to read in the console
     app.add_middleware(LogMiddleware)
-app.add_middleware(SessionMiddleware, secret_key=settings.APP_SECRET.get_secret_value())
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[x for x in settings.CORS_ALLOWED_ORIGINS.split(",") if x],

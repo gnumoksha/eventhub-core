@@ -93,7 +93,7 @@ class OutboxRelay:
                 break
 
             try:
-                self._dispatcher.dispatch(message.to_event())
+                await self._dispatcher.dispatch(message.to_event())
             except EventDispatchError as exc:
                 await self._record_failure(message, exc)
                 break

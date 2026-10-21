@@ -5,12 +5,10 @@ from typing import Self, override
 import pytest
 from libs.events.event import Metadata, PublishableEvent, SerializableDict
 
-from tests.conftest import DummyConfig
 
-
-class SampleEvent(PublishableEvent, name="test:sample_event"):
+class SampleEvent(PublishableEvent, name="test.sample_event"):
     def __init__(self, message: str, metadata: Metadata | None = None) -> None:
-        super().__init__(DummyConfig(), metadata)
+        super().__init__(metadata)
         self.message = message
 
     @override
@@ -56,12 +54,12 @@ class TestMetadata:
 
 class TestPublishableEvent:
     def test_valid_event_registration_and_lookup(self):
-        assert SampleEvent.name() == "test:sample_event"
-        assert PublishableEvent.for_name("test:sample_event") is SampleEvent
+        assert SampleEvent.name() == "test.sample_event"
+        assert PublishableEvent.for_name("test.sample_event") is SampleEvent
 
     def test_unregistered_event_name_raises_key_error(self):
         with pytest.raises(KeyError):
-            PublishableEvent.for_name("test:non_existent_event")
+            PublishableEvent.for_name("test.non_existent_event")
 
     def test_empty_event_name_raises_value_error(self):
         with pytest.raises(ValueError, match="Event name can not be empty"):
@@ -74,7 +72,7 @@ class TestPublishableEvent:
                 @override
                 @classmethod
                 def from_dict(cls, payload: SerializableDict, metadata: Metadata) -> Self:
-                    return cls(DummyConfig(), metadata)
+                    return cls(metadata)
 
     def test_event_name_too_long_raises_value_error(self):
         too_long_name = "x" * 201
@@ -88,13 +86,36 @@ class TestPublishableEvent:
                 @override
                 @classmethod
                 def from_dict(cls, payload: SerializableDict, metadata: Metadata) -> Self:
-                    return cls(DummyConfig(), metadata)
+                    return cls(metadata)
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "eventhub:sales:order.placed",
+            "eventhub.sales.*",
+            "eventhub.sales.#",
+            "Eventhub.sales",
+            "eventhub..sales",
+            "x.",
+        ],
+    )
+    def test_event_name_with_invalid_format_raises_value_error(self, name):
+        with pytest.raises(ValueError, match="must be lowercase words"):
+
+            class _InvalidNameEvent(PublishableEvent, name=name):
+                @override
+                def to_dict(self) -> SerializableDict:
+                    return {}
+
+                @override
+                @classmethod
+                def from_dict(cls, payload: SerializableDict, metadata: Metadata) -> Self:
+                    return cls(metadata)
 
     def test_event_default_and_custom_metadata(self):
         event = SampleEvent("hello")
         assert event.metadata is not None
         assert isinstance(event.metadata.id, uuid.UUID)
-        assert event.config.exchange == "exchange_test"
 
         custom_meta = Metadata(schema_version="3.0.0")
         event_with_custom = SampleEvent("world", metadata=custom_meta)

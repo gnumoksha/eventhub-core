@@ -139,7 +139,7 @@ async def test_stores_integration_events_in_the_outbox(repository: EventReposito
 
     await repository.save(event)
 
-    assert await outbox_event_names(session, event.id) == ["eventhub:events:event.published"]
+    assert await outbox_event_names(session, event.id) == ["eventhub.events.event.published"]
     assert event.pull_events() == []
 
 
@@ -161,6 +161,6 @@ async def test_concurrency_conflict_does_not_store_integration_events(
         await concurrent_repository.save(second)
 
     assert await outbox_event_names(session, event.id) == [
-        "eventhub:events:event.published",
-        "eventhub:events:event.cancelled",
+        "eventhub.events.event.published",
+        "eventhub.events.event.cancelled",
     ]

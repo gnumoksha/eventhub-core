@@ -10,6 +10,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "celery[librabbitmq,redis]>=5.6.3",
     "checkin",
+    "cryptography>=44.0.0",
     "events",
     "fastapi-injectable>=1.6.1",
     "fastapi[standard]>=0.141.1",
@@ -20,15 +21,17 @@ dependencies = [
     "notifications",
     "organizers",
     "payments",
-    "pika>=1.4.4",
+    "pwdlib[argon2]>=0.3.0",
     "psycopg2>=2.9.13",
     "reporting",
+    "redis>=6.0.0",
     "sales",
     "sentry-sdk[fastapi]>=2.70.0",
     "shared",
     "sqlmodel>=0.0.47",
     "ticketing",
     "uuid-utils>=1.0.0",
+    "resend>=2.50.0",
 ]
 
 [dependency-groups]

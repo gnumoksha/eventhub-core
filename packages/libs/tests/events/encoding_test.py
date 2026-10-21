@@ -5,12 +5,10 @@ import pytest
 from libs.events.encoding import JsonDecoder, JsonEncoder, UnmappedEventError
 from libs.events.event import Metadata, PublishableEvent, SerializableDict
 
-from tests.conftest import DummyConfig
 
-
-class EncodableEvent(PublishableEvent, name="test:encodable_event"):
+class EncodableEvent(PublishableEvent, name="test.encodable_event"):
     def __init__(self, key: str, count: int, metadata: Metadata | None = None) -> None:
-        super().__init__(DummyConfig(), metadata)
+        super().__init__(metadata)
         self.key = key
         self.count = count
 
@@ -33,7 +31,7 @@ class TestEncoding:
         assert isinstance(encoded, str)
 
         parsed = json.loads(encoded)
-        assert parsed["name"] == "test:encodable_event"
+        assert parsed["name"] == "test.encodable_event"
         assert parsed["metadata"]["id"] == str(event.metadata.id)
         assert parsed["metadata"]["schema_version"] == "1.0.0"
         assert parsed["payload"] == {"key": "alpha", "count": 42}
@@ -47,7 +45,7 @@ class TestEncoding:
         decoded = decoder.decode(encoded)
 
         assert isinstance(decoded, EncodableEvent)
-        assert decoded.NAME == "test:encodable_event"
+        assert decoded.NAME == "test.encodable_event"
         assert decoded.key == "beta"
         assert decoded.count == 99
         assert decoded.metadata.id == event.metadata.id
@@ -68,7 +66,7 @@ class TestEncoding:
         decoder = JsonDecoder()
         payload = json.dumps(
             {
-                "name": "test:unknown_unregistered_event",
+                "name": "test.unknown_unregistered_event",
                 "metadata": {
                     "id": "018f3a3d-42e8-78c6-bf41-47fb2ef9e31d",
                     "occurred_on": "2025-01-01T10:00:00+00:00",
@@ -78,5 +76,10 @@ class TestEncoding:
             }
         )
 
-        with pytest.raises(UnmappedEventError, match="test:unknown_unregistered_event"):
+        with pytest.raises(UnmappedEventError, match="test.unknown_unregistered_event") as exc_info:
             decoder.decode(payload)
+
+        assert exc_info.value.event_name == "test.unknown_unregistered_event"
+        # it explains the obsolete binding cause, which can only be fixed manually
+        assert "obsolete binding" in str(exc_info.value)
+        assert "remove it manually" in str(exc_info.value)

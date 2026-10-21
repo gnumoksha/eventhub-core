@@ -5,6 +5,8 @@ description = "eventhub identity"
 requires-python = ">=3.14"
 readme = "README.md"
 dependencies = [
+    "pwdlib[argon2]>=0.3.0",
+    "redis>=6.0.0",
 ]
 
 [tool.ruff]

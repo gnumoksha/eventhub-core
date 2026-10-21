@@ -23,7 +23,7 @@ import ticketing
 from libs.events import load_events
 from shared.infra.database import SessionDep
 from shared.infra.di import injectable
-from shared.infra.domain_events import QueueDispatcherDep
+from shared.infra.domain_events import QueueDispatcherDep, close_dispatcher_connection
 from shared.infra.logger import logger
 from shared.infra.observability.sentry import initialize_sentry
 from shared.infra.outbox import OutboxRelay
@@ -55,12 +55,15 @@ async def main(dispatcher: QueueDispatcherDep, session: SessionDep) -> None:
     logger.info("Outbox relay started")
 
     relay = OutboxRelay(session, dispatcher)
-    while not stop.received:
-        published = await relay.relay()
+    try:
+        while not stop.received:
+            published = await relay.relay()
 
-        # nothing pending or the broker is down: wait before polling again
-        if published == 0:
-            await asyncio.sleep(IDLE_SLEEP_SECONDS)
+            # nothing pending or the broker is down: wait before polling again
+            if published == 0:
+                await asyncio.sleep(IDLE_SLEEP_SECONDS)
+    finally:
+        await close_dispatcher_connection()
 
     logger.info("Outbox relay stopped")
 

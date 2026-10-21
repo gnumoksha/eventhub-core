@@ -4,12 +4,11 @@ from datetime import datetime
 from typing import Self, override
 
 from libs.events import Metadata, PublishableEvent, SerializableDict
-from shared.infra.domain_events import DomainEventsConfig
 
 from events.domain.models.event.values import EventID, OrganizationID
 
 
-class EventPublished(PublishableEvent, name="eventhub:events:event.published"):
+class EventPublished(PublishableEvent, name="eventhub.events.event.published"):
     def __init__(  # noqa: PLR0913
         self,
         *,
@@ -20,7 +19,7 @@ class EventPublished(PublishableEvent, name="eventhub:events:event.published"):
         end_at: datetime,
         metadata: Metadata | None = None,
     ) -> None:
-        super().__init__(DomainEventsConfig(), metadata)
+        super().__init__(metadata)
 
         self.event_id = event_id
         self.organization_id = organization_id
@@ -51,7 +50,7 @@ class EventPublished(PublishableEvent, name="eventhub:events:event.published"):
         )
 
 
-class EventPostponed(PublishableEvent, name="eventhub:events:event.postponed"):
+class EventPostponed(PublishableEvent, name="eventhub.events.event.postponed"):
     def __init__(  # noqa: PLR0913
         self,
         *,
@@ -63,7 +62,7 @@ class EventPostponed(PublishableEvent, name="eventhub:events:event.postponed"):
         previous_end_at: datetime,
         metadata: Metadata | None = None,
     ) -> None:
-        super().__init__(DomainEventsConfig(), metadata)
+        super().__init__(metadata)
 
         self.event_id = event_id
         self.organization_id = organization_id
@@ -97,7 +96,7 @@ class EventPostponed(PublishableEvent, name="eventhub:events:event.postponed"):
         )
 
 
-class EventCancelled(PublishableEvent, name="eventhub:events:event.cancelled"):
+class EventCancelled(PublishableEvent, name="eventhub.events.event.cancelled"):
     def __init__(
         self,
         *,
@@ -106,7 +105,7 @@ class EventCancelled(PublishableEvent, name="eventhub:events:event.cancelled"):
         reason: str,
         metadata: Metadata | None = None,
     ) -> None:
-        super().__init__(DomainEventsConfig(), metadata)
+        super().__init__(metadata)
 
         self.event_id = event_id
         self.organization_id = organization_id
@@ -131,7 +130,7 @@ class EventCancelled(PublishableEvent, name="eventhub:events:event.cancelled"):
         )
 
 
-class EventFinished(PublishableEvent, name="eventhub:events:event.finished"):
+class EventFinished(PublishableEvent, name="eventhub.events.event.finished"):
     def __init__(
         self,
         *,
@@ -140,7 +139,7 @@ class EventFinished(PublishableEvent, name="eventhub:events:event.finished"):
         end_at: datetime,
         metadata: Metadata | None = None,
     ) -> None:
-        super().__init__(DomainEventsConfig(), metadata)
+        super().__init__(metadata)
 
         self.event_id = event_id
         self.organization_id = organization_id

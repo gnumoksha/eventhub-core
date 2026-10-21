@@ -1,3 +1,4 @@
+import re
 import uuid
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
@@ -6,30 +7,6 @@ from typing import Self
 import uuid_utils.compat as uuid_compat
 
 SerializableDict = dict[str, str | int | float | bool | None]
-
-
-class Config(ABC):
-    @property
-    @abstractmethod
-    def exchange(self) -> str:
-        """The exchange (topic in Kafka terminology) name to publish to"""
-        pass
-
-    @property
-    @abstractmethod
-    def queue(self) -> str:
-        """The queue name to publish to"""
-        pass
-
-    @property
-    @abstractmethod
-    def routing_key(self) -> str:
-        """
-        The message routing key.
-
-        Useful when using direct or topic exchanges in RabbitMQ.
-        """
-        pass
 
 
 class Metadata:
@@ -108,6 +85,10 @@ class PublishableEvent(ABC):
 
     NAME_MAX_LENGTH: int = 200
 
+    # The name is the routing key and the binding key in the broker, so it must not contain
+    # wildcards ("*" and "#" in RabbitMQ topic exchanges); dots separate the words.
+    _NAME_PATTERN = re.compile(r"[a-z0-9_]+(\.[a-z0-9_]+)*")
+
     _registry: dict[str, type[Self]] = {}
     """Contains the event's name and its class"""
 
@@ -122,6 +103,11 @@ class PublishableEvent(ABC):
             raise ValueError("Event name can not be empty")
         if len(name) > cls.NAME_MAX_LENGTH:
             raise ValueError("Event name must be up to 200 characters long")
+        if not cls._NAME_PATTERN.fullmatch(name):
+            raise ValueError(
+                f'Event name "{name}" must be lowercase words (a-z, 0-9, _) separated by dots, '
+                'e.g. "eventhub.sales.order.placed"'
+            )
 
         if name in PublishableEvent._registry:
             raise ValueError(f'Event name "{name}" is already registered')
@@ -129,8 +115,7 @@ class PublishableEvent(ABC):
         cls.NAME = name
         PublishableEvent._registry[name] = cls
 
-    def __init__(self, config: Config, metadata: Metadata | None):
-        self.config = config
+    def __init__(self, metadata: Metadata | None):
         self.metadata = metadata or Metadata()
 
     @classmethod

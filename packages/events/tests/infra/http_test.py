@@ -6,6 +6,7 @@ from events.application.event.service import EventService, __get_service
 from events.infra.http.routers.setup import setup_routers
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from identity.infra.http.authentication import require_account_id, require_csrf
 
 from tests.conftest import NOW
 
@@ -15,6 +16,8 @@ def client(service: EventService) -> TestClient:
     app = FastAPI()
     setup_routers(app)
     app.dependency_overrides[__get_service] = lambda: service
+    app.dependency_overrides[require_account_id] = lambda: uuid.uuid4()  # noqa: PLW0108
+    app.dependency_overrides[require_csrf] = lambda: None
     return TestClient(app)
 
 

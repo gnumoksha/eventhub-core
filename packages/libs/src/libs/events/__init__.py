@@ -1,7 +1,7 @@
-from .dispatcher import Dispatcher, EventDispatchError, RecordingDispatcher, SyncDispatcher
-from .encoding import EventDecodeError, JsonDecoder, JsonEncoder
-from .event import Config, Metadata, PublishableEvent, SerializableDict
-from .listener import listener
+from .dispatcher import Dispatcher, EventDispatchError, LocalDispatcher, RecordingDispatcher
+from .encoding import EventDecodeError, JsonDecoder, JsonEncoder, UnmappedEventError
+from .event import Metadata, PublishableEvent, SerializableDict
+from .listener import Listener, listened_event_names, listener
 from .loader import load_events, load_listeners
 from .rabbitmq import (
     RabbitMQConnection,
@@ -12,16 +12,18 @@ from .rabbitmq import (
 __all__ = [
     "PublishableEvent",
     "Metadata",
-    "Config",
     "SerializableDict",
     "JsonEncoder",
     "JsonDecoder",
     "EventDecodeError",
+    "UnmappedEventError",
     "Dispatcher",
     "EventDispatchError",
-    "SyncDispatcher",
+    "LocalDispatcher",
     "RecordingDispatcher",
+    "Listener",
     "listener",
+    "listened_event_names",
     "load_listeners",
     "load_events",
     "RabbitMQConnection",

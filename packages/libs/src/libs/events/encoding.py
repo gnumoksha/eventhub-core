@@ -25,7 +25,14 @@ class JsonEncoder(Encoder):
 
 class UnmappedEventError(Exception):
     def __init__(self, event_name: str):
-        super().__init__(f"Event {event_name} does not have a mapped event class. Did you called load_events() before?")
+        self.event_name = event_name
+        super().__init__(
+            f'Event "{event_name}" does not have a mapped event class. Did you call load_events() before? '
+            "If the event came from a RabbitMQ queue that should not receive it (e.g. its listener or its class "
+            "was removed), the queue probably has an obsolete binding for it. Bindings are durable and are not "
+            "removed automatically: remove it manually (e.g. in the RabbitMQ management UI, "
+            f'Queues > <queue> > Bindings, unbind the routing key "{event_name}").'
+        )
 
 
 class EventDecodeError(ValueError):
