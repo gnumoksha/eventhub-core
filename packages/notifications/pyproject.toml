@@ -5,6 +5,9 @@ description = "eventhub notifications"
 requires-python = ">=3.14"
 readme = "README.md"
 dependencies = [
+    "identity",
+    "resend[async]>=2.50.0",
+    "shared",
 ]
 
 [tool.ruff]

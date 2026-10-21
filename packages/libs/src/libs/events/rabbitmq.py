@@ -1,92 +1,74 @@
+import asyncio
 import signal
-from collections.abc import Callable
-from types import FrameType
+from collections.abc import Awaitable, Callable
 from typing import override
 
-import pika
-from pika import BlockingConnection, DeliveryMode
-from pika.adapters.blocking_connection import (
-    BlockingChannel,
+import aio_pika
+from aio_pika import DeliveryMode, Message
+from aio_pika.abc import (
+    AbstractChannel,
+    AbstractIncomingMessage,
+    AbstractQueueIterator,
+    AbstractRobustConnection,
 )
-from pika.exceptions import AMQPConnectionError, NackError, UnroutableError
-from pika.spec import Basic, BasicProperties
+from aio_pika.exceptions import AMQPError, ChannelInvalidStateError, DeliveryError
 
 from .consumer import Consumer
-from .dispatcher import Dispatcher, EventDispatchError, SyncDispatcher
-from .encoding import Decoder, Encoder
+from .dispatcher import Dispatcher, EventDispatchError
+from .encoding import Decoder, Encoder, UnmappedEventError
 from .event import PublishableEvent
 from .logger import logger
 
-ChannelListener = Callable[[BlockingChannel], None]
+ChannelListener = Callable[[AbstractChannel], Awaitable[None]]
 
 
-# TODO create an async connection for the event dispatcher
 class RabbitMQConnection:
-    def __init__(
-        self,
-        amqp_url: str,
-        *,
-        connection_name: str | None = None,
-        blocked_timeout_seconds: int = 10,
-    ):
-        """
-        Args:
-          blocked_timeout_seconds: Bounds how long a publish can block if the
-            broker connection stalls (e.g. a resource alarm) instead of
-            hanging indefinitely.
-        """
+    """
+    Lazily opens a robust connection and a single channel.
+
+    The robust connection reconnects by itself and restores the exchanges, queues,
+    bindings and consumers declared on its channels.
+    """
+
+    def __init__(self, amqp_url: str, *, connection_name: str | None = None):
         self._amqp_url = amqp_url
         self._name = connection_name
-        self._blocked_timeout_seconds = blocked_timeout_seconds
         self._listeners_on_channel: list[ChannelListener] = []
-        self._connection: BlockingConnection | None = None
-        self._channel: BlockingChannel | None = None
-        self._channel_reset = False
+        self._listeners_called = False
+        self._connection: AbstractRobustConnection | None = None
+        self._channel: AbstractChannel | None = None
+        self._lock = asyncio.Lock()
 
     def on_first_channel(self, listener: ChannelListener) -> None:
-        """Add a listener for the first time we get a Channel."""
+        """Add a listener for the first time we get a Channel (e.g. to declare the topology)."""
         self._listeners_on_channel.append(listener)
 
-    def connection(self) -> BlockingConnection:
-        if not self._connection:
-            params = pika.URLParameters(self._amqp_url)
-            params.blocked_connection_timeout = self._blocked_timeout_seconds
+    async def channel(self) -> AbstractChannel:
+        async with self._lock:
+            if self._channel is None or self._channel.is_closed:
+                if self._connection is None or self._connection.is_closed:
+                    self._connection = await aio_pika.connect_robust(
+                        self._amqp_url,
+                        client_properties={"connection_name": self._name} if self._name else None,
+                    )
 
-            if params.client_properties is None:
-                params.client_properties = {}
-            if self._name:
-                params.client_properties["connection_name"] = self._name  # type:ignore
+                # Publisher confirms make publish() wait for the broker to accept the message, and
+                # on_return_raises makes it raise when the message can not be routed to any queue.
+                channel = await self._connection.channel(publisher_confirms=True, on_return_raises=True)
+                if not self._listeners_called:
+                    for listener in self._listeners_on_channel:
+                        await listener(channel)
+                    self._listeners_called = True
 
-            self._connection = pika.BlockingConnection(params)
+                self._channel = channel
 
-        return self._connection
+            return self._channel
 
-    def reset_connection(self) -> None:
-        self.reset_channel()  # channel is attached to the connection
-
-        if self._connection is not None and self._connection.is_open:
-            self._connection.close()
+    async def close(self) -> None:
+        if self._connection is not None and not self._connection.is_closed:
+            await self._connection.close()
         self._connection = None
-
-    def channel(self) -> BlockingChannel:
-        if not self._channel or not self._channel.is_open:
-            channel = self.connection().channel()
-            if not self._channel_reset:
-                for listener in self._listeners_on_channel:
-                    listener(channel)
-
-            self._channel = channel
-
-        return self._channel
-
-    def reset_channel(self) -> None:
-        if self._channel is not None and self._channel.is_open:
-            self._channel.close()
         self._channel = None
-        self._channel_reset = True
-
-    def close(self) -> None:
-        self.reset_connection()
 
 
 class RabbitMQDispatcher(Dispatcher):
@@ -94,62 +76,59 @@ class RabbitMQDispatcher(Dispatcher):
         self,
         connection: RabbitMQConnection,
         encoder: Encoder,
+        exchange: str,
+        *,
+        timeout_seconds: float = 10,
     ) -> None:
+        """
+        Publishes every event to the exchange, using the event name as the routing key.
+
+        Args:
+          exchange: A topic or direct exchange; the queues bind the names of the events they listen to.
+          timeout_seconds: Bounds how long a publish can wait for the broker confirmation
+            (e.g. during a resource alarm) instead of hanging indefinitely.
+        """
         self._connection = connection
         self._encoder = encoder
-        self._confirmed_channel: BlockingChannel | None = None
+        self._exchange = exchange
+        self._timeout_seconds = timeout_seconds
 
     @override
-    def dispatch(self, event: PublishableEvent) -> None:
-        try:
-            self._publish(event)
-            return
-        except (NackError, UnroutableError) as exc:
-            raise EventDispatchError(f'RabbitMQ rejected event "{event.NAME}"') from exc
-        except AMQPConnectionError, OSError:
-            # pika does not always wrap socket failures (e.g. DNS resolution) in AMQPConnectionError
-            logger.exception(
-                'Lost connection to RabbitMQ while dispatching event "%s", reconnecting',
-                event.NAME,
-            )
-            self._connection.reset_channel()
-
-        try:
-            self._publish(event)
-        except (NackError, UnroutableError) as exc:
-            raise EventDispatchError(f'RabbitMQ rejected event "{event.NAME}" after reconnecting') from exc
-        except (AMQPConnectionError, OSError) as exc:
-            raise EventDispatchError(f'Failed to dispatch event "{event.NAME}" after reconnecting') from exc
-
-    def _publish(self, event: PublishableEvent) -> None:
-        channel = self._connection.channel()
-        # Publisher confirms let basic_publish report broker-side nacks and
-        # unroutable messages instead of treating a socket write as success.
-        if channel is not self._confirmed_channel:
-            channel.confirm_delivery()
-            self._confirmed_channel = channel
-        confirmed = channel.basic_publish(
-            exchange=event.config.exchange,
-            # The meaning of a binding key depends on the exchange type.
-            #  - fanout = simply ignored its value.
-            #  - direct = a message goes to the queues whose binding key exactly matches the routing key of the message.
-            #  - topic = a message sent with a particular routing key will be delivered to all the queues that are bound
-            #    with a matching binding key. However there are two important special cases for binding keys:
-            #    * (star) can substitute for exactly one word. When a queue is bound with # (hash) binding key
-            #      it will receive all the messages, regardless of the routing key - like in fanout exchange.
-            #    # (hash) can substitute for zero or more words. When special characters * (star) and # (hash) aren't
-            #      used in bindings, the topic exchange will behave just like a direct one.
-            routing_key=event.config.routing_key,
-            body=self._encoder.encode(event),  # ty:ignore[invalid-argument-type]
-            properties=pika.BasicProperties(
-                # We cannot afford to lose any event, so we already have declared the queue
-                # as "durable" and here messages are sent with delivery mode "persistent".
-                # "persistent" means RabbitMQ will store the message on disk.
-                delivery_mode=DeliveryMode.Persistent,
-            ),
+    async def dispatch(self, event: PublishableEvent) -> None:
+        body = self._encoder.encode(event)
+        message = Message(
+            body.encode() if isinstance(body, str) else body,
+            # We cannot afford to lose any event, so we already have declared the queue
+            # as "durable" and here messages are sent with delivery mode "persistent".
+            # "persistent" means RabbitMQ will store the message on disk.
+            delivery_mode=DeliveryMode.PERSISTENT,
         )
-        if confirmed is False:
-            raise EventDispatchError(f'RabbitMQ did not confirm event "{event.NAME}"')
+
+        try:
+            channel = await self._connection.channel()
+            exchange = await channel.get_exchange(self._exchange, ensure=False)
+            await exchange.publish(
+                message,
+                # The meaning of a binding key depends on the exchange type.
+                #  - fanout = simply ignored its value.
+                #  - direct = a message goes to the queues whose binding key exactly matches the routing key of the message.
+                #  - topic = a message sent with a particular routing key will be delivered to all the queues that are bound
+                #    with a matching binding key. However there are two important special cases for binding keys:
+                #    * (star) can substitute for exactly one word. When a queue is bound with # (hash) binding key
+                #      it will receive all the messages, regardless of the routing key - like in fanout exchange.
+                #    # (hash) can substitute for zero or more words. When special characters * (star) and # (hash) aren't
+                #      used in bindings, the topic exchange will behave just like a direct one.
+                routing_key=event.name(),
+                mandatory=True,
+                timeout=self._timeout_seconds,
+            )
+        except DeliveryError as exc:
+            # The broker nacked the message or could not route it (PublishError is a subclass). An event
+            # that no queue listens to is not an error if the exchange has an alternate exchange.
+            raise EventDispatchError(f'RabbitMQ rejected event "{event.NAME}"') from exc
+        except (AMQPError, ChannelInvalidStateError, OSError) as exc:
+            # OSError includes TimeoutError. The robust connection reconnects in the background; the caller retries later.
+            raise EventDispatchError(f'Failed to dispatch event "{event.NAME}"') from exc
 
 
 class RabbitMQGracefulConsumer(Consumer):
@@ -160,35 +139,34 @@ class RabbitMQGracefulConsumer(Consumer):
         connection: RabbitMQConnection,
         queue: str,
         decoder: Decoder,
-        dispatcher: SyncDispatcher,
+        dispatcher: Dispatcher,
+        *,
+        prefetch_count: int = 1,
     ):
         self._connection = connection
+        self._queue = queue
         self._decoder = decoder
         self._dispatcher = dispatcher
-        self._channel = self._connection.channel()
-        self._channel.basic_qos(prefetch_count=1)
-        self._channel.basic_consume(
-            queue=queue,
-            on_message_callback=self.on_message,
-            auto_ack=False,
-        )
+        self._prefetch_count = prefetch_count
+        self._messages: AbstractQueueIterator | None = None
+        self._stopping = False
+        self._stop_task: asyncio.Task[None] | None = None
 
-    def on_message(
-        self,
-        ch: BlockingChannel,
-        method: Basic.Deliver,
-        properties: BasicProperties,  # noqa: ARG002
-        body: bytes,
-    ) -> None:
+    async def on_message(self, message: AbstractIncomingMessage) -> None:
         try:
-            event = self._decoder.decode(body)
+            event = self._decoder.decode(message.body)
+        except UnmappedEventError:
+            # the message explains the causes: the event class was not loaded or the queue has an obsolete binding
+            logger.exception("Failed to decode event delivery %s", message.delivery_tag)
+            await self._settle(message, ack=False)
+            return
         except Exception:  # noqa: BLE001
             logger.exception(
                 "Failed to decode event delivery %s (body size: %d bytes)",
-                method.delivery_tag,
-                len(body),
+                message.delivery_tag,
+                len(message.body),
             )
-            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)  # ty:ignore[invalid-argument-type]
+            await self._settle(message, ack=False)
             return
 
         try:
@@ -197,37 +175,60 @@ class RabbitMQGracefulConsumer(Consumer):
                 event.NAME,
             )
 
-            self._dispatcher.dispatch(event)
+            await self._dispatcher.dispatch(event)
         except Exception:  # noqa: BLE001
             logger.exception('Failed to process event "%s"', event.NAME)
-            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)  # ty:ignore[invalid-argument-type]
+            await self._settle(message, ack=False)
             return
 
         # Acknowledge message after processing
-        ch.basic_ack(delivery_tag=method.delivery_tag)  # ty:ignore[invalid-argument-type]
+        await self._settle(message, ack=True)
 
-    def exit_gracefully(self, signum: int, frame: FrameType | None) -> None:  # noqa: ARG002
+    async def _settle(self, message: AbstractIncomingMessage, *, ack: bool) -> None:
+        """Acks the message, or nacks it without requeue so it goes to the dead-letter queue."""
+        try:
+            if ack:
+                await message.ack()
+            else:
+                await message.nack(requeue=False)
+        except AMQPError, ChannelInvalidStateError, OSError:
+            # The connection was lost: the broker redelivers the message after the robust connection
+            # reconnects (listeners are idempotent). Crashing here would stop the other consumers too.
+            logger.exception("Could not settle event delivery %s", message.delivery_tag)
+
+    def _on_signal(self, signum: int) -> None:
         logger.info("Received shutdown signal %s; stopping consumer", signum)
-        connection = self._connection.connection()
-        if connection.is_open:
-            connection.add_callback_threadsafe(self.stop)
+        self._stop_task = asyncio.create_task(self.stop())
 
     @override
-    def start(self) -> None:
-        # Signal handlers are process-wide and can only be installed from the
-        # main thread, so do it when the consumer actually starts.
-        signal.signal(signal.SIGTERM, self.exit_gracefully)
-        signal.signal(signal.SIGINT, self.exit_gracefully)
+    async def start(self) -> None:
+        """Consumes messages until stop() is called or SIGTERM/SIGINT is received."""
+        loop = asyncio.get_running_loop()
+        signals = (signal.SIGTERM, signal.SIGINT)
+        for signum in signals:
+            loop.add_signal_handler(signum, self._on_signal, signum)
 
         try:
-            self._channel.start_consuming()
+            channel = await self._connection.channel()
+            await channel.set_qos(prefetch_count=self._prefetch_count)
+            queue = await channel.get_queue(self._queue)
+            async with queue.iterator() as messages:
+                self._messages = messages
+                if self._stopping:
+                    return
+                async for message in messages:
+                    await self.on_message(message)
         finally:
-            self.stop()
+            for signum in signals:
+                loop.remove_signal_handler(signum)
+            await self._connection.close()
 
     @override
-    def stop(self) -> None:
-        try:
-            if self._channel.is_open:
-                self._channel.stop_consuming()
-        finally:
-            self._connection.close()
+    async def stop(self) -> None:
+        """
+        Stops receiving new messages. The message being processed is finished and acknowledged;
+        the prefetched ones are requeued.
+        """
+        self._stopping = True
+        if self._messages is not None:
+            await self._messages.close()

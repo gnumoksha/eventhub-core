@@ -16,7 +16,7 @@ def client(service: EventService) -> TestClient:
     app = FastAPI()
     setup_routers(app)
     app.dependency_overrides[__get_service] = lambda: service
-    app.dependency_overrides[require_account_id] = lambda: uuid.uuid4()
+    app.dependency_overrides[require_account_id] = lambda: uuid.uuid4()  # noqa: PLW0108
     app.dependency_overrides[require_csrf] = lambda: None
     return TestClient(app)
 

@@ -1,39 +1,27 @@
+import asyncio
+import signal
 from typing import Self, override
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from libs.events.dispatcher import EventDispatchError, SyncDispatcher
-from libs.events.encoding import JsonEncoder
-from libs.events.event import Config, Metadata, PublishableEvent, SerializableDict
+from aio_pika import DeliveryMode
+from aio_pika.exceptions import AMQPConnectionError, ChannelInvalidStateError, DeliveryError, PublishError
+from libs.events.dispatcher import Dispatcher, EventDispatchError
+from libs.events.encoding import EventDecodeError, JsonEncoder, UnmappedEventError
+from libs.events.event import Metadata, PublishableEvent, SerializableDict
 from libs.events.rabbitmq import (
     RabbitMQConnection,
     RabbitMQDispatcher,
     RabbitMQGracefulConsumer,
 )
-from pika import DeliveryMode
-from pika.exceptions import AMQPConnectionError
+from pamqp.commands import Basic
+
+pytestmark = pytest.mark.asyncio
 
 
-class RabbitConfig(Config):
-    @property
-    @override
-    def exchange(self) -> str:
-        return "test_exchange"
-
-    @property
-    @override
-    def queue(self) -> str:
-        return "test_queue"
-
-    @property
-    @override
-    def routing_key(self) -> str:
-        return "test.route"
-
-
-class RabbitSampleEvent(PublishableEvent, name="test:rabbit_event"):
+class RabbitSampleEvent(PublishableEvent, name="test.rabbit_event"):
     def __init__(self, data: str, metadata: Metadata | None = None) -> None:
-        super().__init__(RabbitConfig(), metadata)
+        super().__init__(metadata)
         self.data = data
 
     @override
@@ -46,230 +34,288 @@ class RabbitSampleEvent(PublishableEvent, name="test:rabbit_event"):
         return cls(str(payload["data"]), metadata)
 
 
+def make_connection(channel: MagicMock | None = None) -> MagicMock:
+    connection = MagicMock(spec=RabbitMQConnection)
+    connection.channel = AsyncMock(return_value=channel or MagicMock())
+    connection.close = AsyncMock()
+    return connection
+
+
+def make_message(body: bytes = b"body", delivery_tag: int = 1) -> MagicMock:
+    message = MagicMock(body=body, delivery_tag=delivery_tag)
+    message.ack = AsyncMock()
+    message.nack = AsyncMock()
+    return message
+
+
 class TestRabbitMQConnection:
-    @patch("libs.events.rabbitmq.pika.BlockingConnection")
-    def test_connection_creation_with_params(self, mock_blocking_conn):
-        conn = RabbitMQConnection(
-            "amqp://guest:guest@localhost:5672/",
-            connection_name="my_worker",
-            blocked_timeout_seconds=15,
+    @patch("libs.events.rabbitmq.aio_pika.connect_robust", new_callable=AsyncMock)
+    async def test_connection_creation_with_params(self, mock_connect):
+        conn = RabbitMQConnection("amqp://guest:guest@localhost:5672/", connection_name="my_worker")
+
+        channel = await conn.channel()
+
+        mock_connect.assert_awaited_once_with(
+            "amqp://guest:guest@localhost:5672/", client_properties={"connection_name": "my_worker"}
         )
+        mock_connect.return_value.channel.assert_awaited_once_with(publisher_confirms=True, on_return_raises=True)
+        assert channel == mock_connect.return_value.channel.return_value
 
-        res = conn.connection()
-        assert res == mock_blocking_conn.return_value
-        mock_blocking_conn.assert_called_once()
-        params = mock_blocking_conn.call_args[0][0]
-        assert params.blocked_connection_timeout == 15
-        assert params.client_properties["connection_name"] == "my_worker"
-
-    @patch("libs.events.rabbitmq.pika.BlockingConnection")
-    def test_connection_cached_until_reset(self, mock_blocking_conn):
+    @patch("libs.events.rabbitmq.aio_pika.connect_robust", new_callable=AsyncMock)
+    async def test_channel_cached_while_open(self, mock_connect):
+        mock_connect.return_value.is_closed = False
+        mock_connect.return_value.channel.return_value = MagicMock(is_closed=False)
         conn = RabbitMQConnection("amqp://localhost")
-        c1 = conn.connection()
-        c2 = conn.connection()
-        assert c1 == c2
-        assert mock_blocking_conn.call_count == 1
 
-        conn.reset_connection()
-        _ = conn.connection()
-        assert mock_blocking_conn.call_count == 2
+        assert await conn.channel() is await conn.channel()
+        assert mock_connect.await_count == 1
+        assert mock_connect.return_value.channel.await_count == 1
 
-    @patch("libs.events.rabbitmq.pika.BlockingConnection")
-    def test_channel_listener_called_on_first_channel(self, mock_blocking_conn):
-        mock_conn = MagicMock()
-        mock_channel = MagicMock()
-        mock_channel.is_open = True
-        mock_conn.channel.return_value = mock_channel
-        mock_blocking_conn.return_value = mock_conn
-
+    @patch("libs.events.rabbitmq.aio_pika.connect_robust", new_callable=AsyncMock)
+    async def test_listeners_called_only_on_first_channel(self, mock_connect):
+        mock_connect.return_value.is_closed = False
+        ch1 = MagicMock(is_closed=False)
+        ch2 = MagicMock(is_closed=False)
+        mock_connect.return_value.channel.side_effect = [ch1, ch2]
         conn = RabbitMQConnection("amqp://localhost")
-        listener_called = False
+        received: list[MagicMock] = []
 
-        def my_listener(ch):
-            nonlocal listener_called
-            listener_called = True
-            assert ch == mock_channel
+        async def my_listener(ch):
+            received.append(ch)
 
         conn.on_first_channel(my_listener)
-        ch = conn.channel()
+        assert await conn.channel() is ch1
+        ch1.is_closed = True
+        assert await conn.channel() is ch2
 
-        assert ch == mock_channel
-        assert listener_called
+        assert received == [ch1]
 
-    @patch("libs.events.rabbitmq.pika.BlockingConnection")
-    def test_reset_channel_does_not_call_listeners_again(self, mock_blocking_conn):
-        mock_conn = MagicMock()
-        mock_ch1 = MagicMock(is_open=True)
-        mock_ch2 = MagicMock(is_open=True)
-        mock_conn.channel.side_effect = [mock_ch1, mock_ch2]
-        mock_blocking_conn.return_value = mock_conn
-
+    @patch("libs.events.rabbitmq.aio_pika.connect_robust", new_callable=AsyncMock)
+    async def test_listeners_called_again_if_they_failed(self, mock_connect):
+        mock_connect.return_value.is_closed = False
         conn = RabbitMQConnection("amqp://localhost")
-        listener_call_count = 0
+        listener = AsyncMock(side_effect=[AMQPConnectionError("down"), None])
+        conn.on_first_channel(listener)
 
-        def my_listener(ch):
-            nonlocal listener_call_count
-            listener_call_count += 1
+        with pytest.raises(AMQPConnectionError):
+            await conn.channel()
+        await conn.channel()
 
-        conn.on_first_channel(my_listener)
-        assert conn.channel() == mock_ch1
-        assert listener_call_count == 1
+        assert listener.await_count == 2
 
-        conn.reset_channel()
-        assert conn.channel() == mock_ch2
-        assert listener_call_count == 1  # Not called again after reset
+    @patch("libs.events.rabbitmq.aio_pika.connect_robust", new_callable=AsyncMock)
+    async def test_close(self, mock_connect):
+        mock_connect.return_value.is_closed = False
+        conn = RabbitMQConnection("amqp://localhost")
+        await conn.channel()
+
+        await conn.close()
+        await conn.channel()
+
+        mock_connect.return_value.close.assert_awaited_once()
+        assert mock_connect.await_count == 2
 
 
 class TestRabbitMQDispatcher:
-    def test_dispatch_publishes_event_successfully(self):
-        mock_conn = MagicMock()
-        mock_channel = MagicMock()
-        mock_conn.channel.return_value = mock_channel
-
+    async def test_dispatch_publishes_event_successfully(self):
+        channel = MagicMock()
+        exchange = channel.get_exchange = AsyncMock()
+        exchange.return_value.publish = AsyncMock()
         encoder = JsonEncoder()
-        dispatcher = RabbitMQDispatcher(mock_conn, encoder)
+        dispatcher = RabbitMQDispatcher(make_connection(channel), encoder, "test_exchange", timeout_seconds=3)
         event = RabbitSampleEvent("hello")
 
-        dispatcher.dispatch(event)
+        await dispatcher.dispatch(event)
 
-        mock_channel.basic_publish.assert_called_once()
-        kwargs = mock_channel.basic_publish.call_args.kwargs
-        assert kwargs["exchange"] == "test_exchange"
-        assert kwargs["routing_key"] == "test.route"
-        assert kwargs["body"] == encoder.encode(event)
-        assert kwargs["properties"].delivery_mode == DeliveryMode.Persistent.value
+        channel.get_exchange.assert_awaited_once_with("test_exchange", ensure=False)
+        publish = exchange.return_value.publish
+        publish.assert_awaited_once()
+        message = publish.call_args.args[0]
+        assert message.body == encoder.encode(event).encode()
+        assert message.delivery_mode == DeliveryMode.PERSISTENT
+        assert publish.call_args.kwargs == {"routing_key": "test.rabbit_event", "mandatory": True, "timeout": 3}
 
-    def test_dispatch_retries_on_connection_error(self):
-        mock_conn = MagicMock()
-        mock_channel = MagicMock()
-        mock_conn.channel.return_value = mock_channel
+    @pytest.mark.parametrize(
+        "error",
+        [
+            DeliveryError(None, Basic.Nack(delivery_tag=1)),
+            PublishError(
+                MagicMock(delivery=Basic.Return(reply_code=312, reply_text="NO_ROUTE")),
+                Basic.Return(reply_code=312, reply_text="NO_ROUTE"),
+            ),
+        ],
+    )
+    async def test_dispatch_raises_when_broker_rejects_the_event(self, error):
+        channel = MagicMock()
+        channel.get_exchange = AsyncMock()
+        channel.get_exchange.return_value.publish = AsyncMock(side_effect=error)
+        dispatcher = RabbitMQDispatcher(make_connection(channel), JsonEncoder(), "test_exchange")
 
-        # First call fails, second succeeds
-        mock_channel.basic_publish.side_effect = [AMQPConnectionError("lost"), None]
+        with pytest.raises(EventDispatchError, match='RabbitMQ rejected event "test.rabbit_event"'):
+            await dispatcher.dispatch(RabbitSampleEvent("rejected"))
 
-        dispatcher = RabbitMQDispatcher(mock_conn, JsonEncoder())
-        event = RabbitSampleEvent("retry_me")
+    @pytest.mark.parametrize(
+        "error",
+        [AMQPConnectionError("lost"), ChannelInvalidStateError("closed"), OSError("dns"), TimeoutError()],
+    )
+    async def test_dispatch_raises_on_connection_failures(self, error):
+        channel = MagicMock()
+        channel.get_exchange = AsyncMock()
+        channel.get_exchange.return_value.publish = AsyncMock(side_effect=error)
+        dispatcher = RabbitMQDispatcher(make_connection(channel), JsonEncoder(), "test_exchange")
 
-        dispatcher.dispatch(event)
+        with pytest.raises(EventDispatchError, match='Failed to dispatch event "test.rabbit_event"'):
+            await dispatcher.dispatch(RabbitSampleEvent("fail_event"))
 
-        assert mock_channel.basic_publish.call_count == 2
-        mock_conn.reset_channel.assert_called_once()
+    async def test_dispatch_raises_when_it_can_not_connect(self):
+        connection = make_connection()
+        connection.channel.side_effect = AMQPConnectionError("refused")
+        dispatcher = RabbitMQDispatcher(connection, JsonEncoder(), "test_exchange")
 
-    def test_dispatch_raises_event_dispatch_error_if_retry_fails(self):
-        mock_conn = MagicMock()
-        mock_channel = MagicMock()
-        mock_conn.channel.return_value = mock_channel
-
-        # Both attempts fail
-        mock_channel.basic_publish.side_effect = [
-            AMQPConnectionError("fail 1"),
-            OSError("fail 2"),
-        ]
-
-        dispatcher = RabbitMQDispatcher(mock_conn, JsonEncoder())
-        event = RabbitSampleEvent("fail_event")
-
-        with pytest.raises(EventDispatchError, match='Failed to dispatch event "test:rabbit_event" after reconnecting'):
-            dispatcher.dispatch(event)
-
-        assert mock_channel.basic_publish.call_count == 2
-        mock_conn.reset_channel.assert_called_once()
+        with pytest.raises(EventDispatchError, match='Failed to dispatch event "test.rabbit_event"'):
+            await dispatcher.dispatch(RabbitSampleEvent("fail_event"))
 
 
 class TestRabbitMQGracefulConsumer:
-    @patch("libs.events.rabbitmq.signal.signal")
-    def test_consumer_initialization(self, mock_signal):
-        mock_conn = MagicMock()
-        mock_channel = MagicMock()
-        mock_conn.channel.return_value = mock_channel
-        mock_decoder = MagicMock()
-        mock_dispatcher = MagicMock(spec=SyncDispatcher)
+    def make_consumer(self, decoder: MagicMock, dispatcher: MagicMock | None = None) -> RabbitMQGracefulConsumer:
+        return RabbitMQGracefulConsumer(make_connection(), "q", decoder, dispatcher or MagicMock(spec=Dispatcher))
 
-        consumer = RabbitMQGracefulConsumer(
-            connection=mock_conn,
-            queue="my_queue",
-            decoder=mock_decoder,
-            dispatcher=mock_dispatcher,
-        )
-
-        mock_channel.basic_qos.assert_called_once_with(prefetch_count=1)
-        mock_channel.basic_consume.assert_called_once_with(
-            queue="my_queue",
-            on_message_callback=consumer.on_message,
-            auto_ack=False,
-        )
-        mock_signal.assert_not_called()
-
-    @patch("libs.events.rabbitmq.signal.signal")
-    def test_on_message_success_acks(self, _mock_signal):
-        mock_conn = MagicMock()
-        mock_decoder = MagicMock()
-        mock_dispatcher = MagicMock(spec=SyncDispatcher)
-        mock_ch = MagicMock()
-        mock_method = MagicMock(delivery_tag=123)
-        mock_props = MagicMock()
-
+    async def test_on_message_success_acks(self):
         event = RabbitSampleEvent("success")
-        mock_decoder.decode.return_value = event
+        decoder = MagicMock()
+        decoder.decode.return_value = event
+        dispatcher = MagicMock(spec=Dispatcher)
+        dispatcher.dispatch = AsyncMock()
+        message = make_message(b"body")
 
-        consumer = RabbitMQGracefulConsumer(mock_conn, "q", mock_decoder, mock_dispatcher)
-        consumer.on_message(mock_ch, mock_method, mock_props, b"body")
+        await self.make_consumer(decoder, dispatcher).on_message(message)
 
-        mock_decoder.decode.assert_called_once_with(b"body")
-        mock_dispatcher.dispatch.assert_called_once_with(event)
-        mock_ch.basic_ack.assert_called_once_with(delivery_tag=123)
-        mock_ch.basic_nack.assert_not_called()
+        decoder.decode.assert_called_once_with(b"body")
+        dispatcher.dispatch.assert_awaited_once_with(event)
+        message.ack.assert_awaited_once()
+        message.nack.assert_not_awaited()
 
-    @patch("libs.events.rabbitmq.signal.signal")
-    def test_on_message_decode_failure_nacks_without_requeue(self, _mock_signal):
-        mock_conn = MagicMock()
-        mock_decoder = MagicMock()
-        mock_decoder.decode.side_effect = ValueError("corrupt json")
-        mock_dispatcher = MagicMock(spec=SyncDispatcher)
-        mock_ch = MagicMock()
-        mock_method = MagicMock(delivery_tag=456)
-        mock_props = MagicMock()
+    async def test_on_message_decode_failure_nacks_without_requeue(self):
+        decoder = MagicMock()
+        decoder.decode.side_effect = EventDecodeError("corrupt json")
+        dispatcher = MagicMock(spec=Dispatcher)
+        dispatcher.dispatch = AsyncMock()
+        message = make_message(b"invalid")
 
-        consumer = RabbitMQGracefulConsumer(mock_conn, "q", mock_decoder, mock_dispatcher)
-        consumer.on_message(mock_ch, mock_method, mock_props, b"invalid")
+        await self.make_consumer(decoder, dispatcher).on_message(message)
 
-        mock_ch.basic_nack.assert_called_once_with(delivery_tag=456, requeue=False)
-        mock_ch.basic_ack.assert_not_called()
-        mock_dispatcher.dispatch.assert_not_called()
+        message.nack.assert_awaited_once_with(requeue=False)
+        message.ack.assert_not_awaited()
+        dispatcher.dispatch.assert_not_awaited()
 
-    @patch("libs.events.rabbitmq.signal.signal")
-    def test_on_message_dispatch_failure_nacks_without_requeue(self, _mock_signal):
-        mock_conn = MagicMock()
-        mock_decoder = MagicMock()
-        mock_dispatcher = MagicMock(spec=SyncDispatcher)
-        mock_dispatcher.dispatch.side_effect = RuntimeError("handler crashed")
-        mock_ch = MagicMock()
-        mock_method = MagicMock(delivery_tag=789)
-        mock_props = MagicMock()
+    async def test_on_message_nacks_unmapped_events(self):
+        decoder = MagicMock()
+        decoder.decode.side_effect = UnmappedEventError("other_context.something.happened")
+        message = make_message()
 
-        event = RabbitSampleEvent("crash")
-        mock_decoder.decode.return_value = event
+        await self.make_consumer(decoder).on_message(message)
 
-        consumer = RabbitMQGracefulConsumer(mock_conn, "q", mock_decoder, mock_dispatcher)
-        consumer.on_message(mock_ch, mock_method, mock_props, b"valid")
+        message.nack.assert_awaited_once_with(requeue=False)
+        message.ack.assert_not_awaited()
 
-        mock_ch.basic_nack.assert_called_once_with(delivery_tag=789, requeue=False)
-        mock_ch.basic_ack.assert_not_called()
+    async def test_on_message_dispatch_failure_nacks_without_requeue(self):
+        decoder = MagicMock()
+        decoder.decode.return_value = RabbitSampleEvent("crash")
+        dispatcher = MagicMock(spec=Dispatcher)
+        dispatcher.dispatch = AsyncMock(side_effect=RuntimeError("handler crashed"))
+        message = make_message()
 
-    @patch("libs.events.rabbitmq.signal.signal")
-    def test_start_and_stop(self, _mock_signal):
-        mock_conn = MagicMock()
-        mock_channel = MagicMock(is_open=True)
-        mock_pika_conn = MagicMock(is_open=True)
-        mock_conn.channel.return_value = mock_channel
-        mock_conn.connection.return_value = mock_pika_conn
-        mock_conn.close.side_effect = lambda: setattr(mock_channel, "is_open", False)
+        await self.make_consumer(decoder, dispatcher).on_message(message)
 
-        consumer = RabbitMQGracefulConsumer(mock_conn, "q", MagicMock(), MagicMock(spec=SyncDispatcher))
+        message.nack.assert_awaited_once_with(requeue=False)
+        message.ack.assert_not_awaited()
 
-        consumer.start()
-        mock_channel.start_consuming.assert_called_once()
-        assert _mock_signal.call_count == 2
+    async def test_on_message_does_not_crash_when_ack_fails(self):
+        decoder = MagicMock()
+        decoder.decode.return_value = RabbitSampleEvent("lost connection")
+        dispatcher = MagicMock(spec=Dispatcher)
+        dispatcher.dispatch = AsyncMock()
+        message = make_message()
+        message.ack.side_effect = ChannelInvalidStateError("closed")
 
-        mock_channel.stop_consuming.assert_called_once()
-        mock_conn.close.assert_called_once()
+        await self.make_consumer(decoder, dispatcher).on_message(message)
+
+        message.ack.assert_awaited_once()
+
+    async def test_start_consumes_until_stop_and_finishes_the_current_message(self):
+        received = asyncio.Event()
+        release = asyncio.Event()
+        processed: list[str] = []
+
+        class Iterator:
+            def __init__(self) -> None:
+                self.closed = asyncio.Event()
+                self.close = AsyncMock(side_effect=self.closed.set)
+                self.sent = False
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                await self.close()
+
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                if not self.sent:
+                    self.sent = True
+                    return make_message(b"first")
+                await self.closed.wait()
+                raise StopAsyncIteration
+
+        iterator = Iterator()
+        queue = MagicMock()
+        queue.iterator.return_value = iterator
+        channel = MagicMock()
+        channel.set_qos = AsyncMock()
+        channel.get_queue = AsyncMock(return_value=queue)
+        connection = make_connection(channel)
+
+        decoder = MagicMock()
+        decoder.decode.return_value = RabbitSampleEvent("first")
+        dispatcher = MagicMock(spec=Dispatcher)
+
+        async def dispatch(event: RabbitSampleEvent) -> None:
+            received.set()
+            await release.wait()
+            processed.append(event.data)
+
+        dispatcher.dispatch = AsyncMock(side_effect=dispatch)
+        consumer = RabbitMQGracefulConsumer(connection, "my_queue", decoder, dispatcher, prefetch_count=5)
+
+        with patch.object(asyncio.get_running_loop(), "add_signal_handler") as add_signal_handler:
+            task = asyncio.create_task(consumer.start())
+            await received.wait()
+            await consumer.stop()  # while the message is being processed
+            release.set()
+            await asyncio.wait_for(task, timeout=1)
+
+        assert processed == ["first"]
+        channel.set_qos.assert_awaited_once_with(prefetch_count=5)
+        channel.get_queue.assert_awaited_once_with("my_queue")
+        assert {call.args[0] for call in add_signal_handler.call_args_list} == {signal.SIGTERM, signal.SIGINT}
+        connection.close.assert_awaited_once()
+
+    async def test_stop_before_start_does_not_consume(self):
+        iterator = MagicMock()
+        iterator.__aenter__ = AsyncMock(return_value=iterator)
+        iterator.__aexit__ = AsyncMock()
+        queue = MagicMock()
+        queue.iterator.return_value = iterator
+        channel = MagicMock()
+        channel.set_qos = AsyncMock()
+        channel.get_queue = AsyncMock(return_value=queue)
+        connection = make_connection(channel)
+        consumer = RabbitMQGracefulConsumer(connection, "q", MagicMock(), MagicMock(spec=Dispatcher))
+
+        await consumer.stop()
+        await consumer.start()
+
+        iterator.__aiter__.assert_not_called()
+        connection.close.assert_awaited_once()

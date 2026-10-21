@@ -11,6 +11,7 @@ resources:
   - rabbitmq.yaml
   - eventhub.yaml
   - workers/outbox-relay.yaml
+  - workers/notifications-events-consumer.yaml
   - cronjobs/finish-ended-events.yaml
 
 secretGenerator:

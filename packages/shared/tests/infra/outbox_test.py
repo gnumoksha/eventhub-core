@@ -5,7 +5,6 @@ import pytest
 import pytest_asyncio
 from libs.events import EventDispatchError, Metadata, PublishableEvent, RecordingDispatcher, SerializableDict
 from shared.infra.database import engine
-from shared.infra.domain_events import DomainEventsConfig
 from shared.infra.outbox import OutboxMessage, OutboxRelay, add_to_outbox
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,9 +13,9 @@ from sqlmodel import col, select, update
 pytestmark = [pytest.mark.database_access, pytest.mark.asyncio]
 
 
-class SomethingHappened(PublishableEvent, name="test:outbox.something_happened"):
+class SomethingHappened(PublishableEvent, name="test.outbox.something_happened"):
     def __init__(self, value: str, metadata: Metadata | None = None) -> None:
-        super().__init__(DomainEventsConfig(), metadata)
+        super().__init__(metadata)
         self.value = value
 
     @override
@@ -31,7 +30,7 @@ class SomethingHappened(PublishableEvent, name="test:outbox.something_happened")
 
 class FailingDispatcher(RecordingDispatcher):
     @override
-    def dispatch(self, event: PublishableEvent) -> None:
+    async def dispatch(self, event: PublishableEvent) -> None:
         raise EventDispatchError(f"broker is down, could not publish {event.name()}")
 
 
@@ -125,8 +124,8 @@ async def test_broker_failure_keeps_the_message_pending_and_stops(session: Async
 async def test_discards_unknown_events_without_blocking_the_next_ones(session: AsyncSession):
     session.add(
         OutboxMessage(
-            event_name="test:outbox.unknown",
-            message={"name": "test:outbox.unknown", "metadata": Metadata().to_dict(), "payload": {}},
+            event_name="test.outbox.unknown",
+            message={"name": "test.outbox.unknown", "metadata": Metadata().to_dict(), "payload": {}},
         )
     )
     await session.commit()
@@ -136,7 +135,7 @@ async def test_discards_unknown_events_without_blocking_the_next_ones(session: A
     assert await OutboxRelay(session, dispatcher).relay() == 1
 
     assert values_of(dispatcher) == ["after the unknown one"]
-    result = await session.execute(select(OutboxMessage).where(OutboxMessage.event_name == "test:outbox.unknown"))
+    result = await session.execute(select(OutboxMessage).where(OutboxMessage.event_name == "test.outbox.unknown"))
     unknown = result.scalars().one()
     assert unknown.discarded_at is not None
     assert unknown.last_error is not None

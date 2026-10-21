@@ -5,9 +5,9 @@ class Consumer(ABC):
     """Abstract event consumer"""
 
     @abstractmethod
-    def start(self) -> None:
+    async def start(self) -> None:
         pass
 
     @abstractmethod
-    def stop(self) -> None:
+    async def stop(self) -> None:
         pass

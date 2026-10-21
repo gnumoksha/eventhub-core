@@ -12,7 +12,7 @@ class EventDispatchError(Exception):
 
 class Dispatcher(ABC):
     @abstractmethod
-    def dispatch(self, event: PublishableEvent) -> None:
+    async def dispatch(self, event: PublishableEvent) -> None:
         """
         Raises:
             EventDispatchError:
@@ -20,15 +20,22 @@ class Dispatcher(ABC):
         pass
 
 
-class SyncDispatcher(Dispatcher):
+class LocalDispatcher(Dispatcher):
+    """Calls the listeners registered in this process, one after the other."""
+
     @override
-    def dispatch(self, event: PublishableEvent) -> None:
+    async def dispatch(self, event: PublishableEvent) -> None:
         if event.name() not in _listeners:
-            logger.warning("No listeners registered for event: %s", event.name())
+            logger.warning(
+                "No listeners registered for event: %s. If it came from a RabbitMQ queue, the queue probably has "
+                "an obsolete binding for it (e.g. its listener was removed); remove the binding manually.",
+                event.name(),
+            )
             return
 
+        # sequentially, so a failure stops the next listeners and the whole event is retried (listeners are idempotent)
         for func in _listeners[event.name()]:
-            func(event)
+            await func(event)
 
 
 class RecordingDispatcher(Dispatcher):
@@ -36,5 +43,5 @@ class RecordingDispatcher(Dispatcher):
         self.dispatched: list[PublishableEvent] = []
 
     @override
-    def dispatch(self, event: PublishableEvent) -> None:
+    async def dispatch(self, event: PublishableEvent) -> None:
         self.dispatched.append(event)
