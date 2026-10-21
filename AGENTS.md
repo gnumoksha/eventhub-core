@@ -1,8 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-Event management and ticketing platform (similar to Sympla), built as a **modular monolith**: FastAPI + SQLModel (async, PostgreSQL), RabbitMQ for integration events, Celery for tasks, Python 3.14, uv workspace.
+Event management and ticketing platform, built as a **modular monolith**: FastAPI + SQLModel (async, PostgreSQL), RabbitMQ for integration events, Celery for tasks, Python 3.14, uv workspace.
 
 ## Commands
 
