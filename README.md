@@ -1,6 +1,6 @@
-# EventHub Core
+# EventHub
 
-EventHub Core is the backend for an event management and ticketing platform inspired by services such as Sympla. It covers the event lifecycle: organizer and event registration, offer publication, ticket reservations and purchases, ticket issuance and validation, and organizer payouts.
+EventHub is the backend for an event management and ticketing platform inspired by services such as Eventbrite and Sympla. It aims to be a demonstration of a complex product built with production-ready technology.
 
 The repository is under active development. Its contexts and contracts are organized to support an end-to-end product; see the code and the [roadmap](var/docs/roadmap.md) for implementation progress.
 
