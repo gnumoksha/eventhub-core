@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import ClassVar, Self
 
+from shared.domain.errors import InvalidValue
+
 
 @dataclass(frozen=True, slots=True)
 class Email:
@@ -25,11 +27,11 @@ class Email:
         """
         value = email.strip().casefold()
         if len(value) > cls.MAX_LEN or value.count("@") != 1:
-            raise ValueError("Enter a valid email address")
+            raise InvalidValue("Enter a valid email address")
 
         local, domain = value.rsplit("@", 1)
         if not local or not domain or "." not in domain or any(char.isspace() for char in value):
-            raise ValueError("Enter a valid email address")
+            raise InvalidValue("Enter a valid email address")
 
         return value
 
@@ -43,6 +45,6 @@ class Password:
 
     def __post_init__(self) -> None:
         if len(self.value) < self.MIN_LEN:
-            raise ValueError(f"Password must contain at least {self.MIN_LEN} characters")
+            raise InvalidValue(f"Password must contain at least {self.MIN_LEN} characters")
         if len(self.value) > self.MAX_LEN:
-            raise ValueError(f"Password must contain at most {self.MAX_LEN} characters")
+            raise InvalidValue(f"Password must contain at most {self.MAX_LEN} characters")

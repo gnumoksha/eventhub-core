@@ -40,7 +40,7 @@ _UNROUTED_TTL_MILLISECONDS = 7 * 24 * 60 * 60 * 1000
 _UNROUTED_MAX_LENGTH = 100_000
 
 
-async def declare_events_exchange(channel: AbstractChannel) -> AbstractExchange:
+async def __declare_events_exchange(channel: AbstractChannel) -> AbstractExchange:
     """
     Declares the exchange the events are published to, along with its alternate exchange/queue.
 
@@ -74,7 +74,7 @@ def __context_queue_name(context: str) -> str:
     return f"{context}.events"
 
 
-async def declare_context_queue(channel: AbstractChannel, context: str) -> AbstractQueue:
+async def __declare_context_queue(channel: AbstractChannel, context: str) -> AbstractQueue:
     """
     Declares the context's events queue along with its dead-letter exchange/queue, and binds
     the queue to the events that have listeners loaded in this process.
@@ -103,7 +103,7 @@ async def declare_context_queue(channel: AbstractChannel, context: str) -> Abstr
     await dlq.bind(dlx)
 
     # Setup main exchange and queue
-    exchange = await declare_events_exchange(channel)
+    exchange = await __declare_events_exchange(channel)
     queue = await channel.declare_queue(
         queue_name,
         durable=True,
@@ -132,7 +132,7 @@ async def consume_events(context: str) -> None:
     )
 
     async def declare_topology(channel: AbstractChannel) -> None:
-        await declare_context_queue(channel, context)
+        await __declare_context_queue(channel, context)
 
     connection.on_first_channel(declare_topology)
 
@@ -151,11 +151,11 @@ _connection = RabbitMQConnection(
 )
 
 
-async def _declare_exchange(channel: AbstractChannel) -> None:
-    await declare_events_exchange(channel)
+async def __declare_exchange(channel: AbstractChannel) -> None:
+    await __declare_events_exchange(channel)
 
 
-_connection.on_first_channel(_declare_exchange)
+_connection.on_first_channel(__declare_exchange)
 
 
 async def close_dispatcher_connection() -> None:
@@ -167,5 +167,3 @@ def __get_queue_dispatcher() -> RabbitMQDispatcher:
 
 
 QueueDispatcherDep = Annotated[RabbitMQDispatcher, Depends(__get_queue_dispatcher)]
-
-DispatcherDep = Annotated[Dispatcher, Depends(__get_queue_dispatcher)]

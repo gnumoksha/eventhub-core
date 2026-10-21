@@ -1,5 +1,6 @@
 import pytest
 from identity.domain.models.values import Email, Password
+from shared.domain.errors import InvalidValue
 
 
 class TestEmail:
@@ -10,13 +11,13 @@ class TestEmail:
 
     @pytest.mark.parametrize("value", ["", "no-at-sign", "a@b", "a b@example.com", "a@@example.com"])
     def test_rejects_invalid_values(self, value: str) -> None:
-        with pytest.raises(ValueError, match="Enter a valid email address"):
+        with pytest.raises(InvalidValue, match="Enter a valid email address"):
             Email(value)
 
     def test_rejects_values_longer_than_maximum_length(self) -> None:
         value = f"{'a' * 309}@example.com"
 
-        with pytest.raises(ValueError, match="Enter a valid email address"):
+        with pytest.raises(InvalidValue, match="Enter a valid email address"):
             Email(value)
 
     def test_from_trusted_skips_validation_and_preserves_value(self) -> None:
@@ -37,9 +38,9 @@ class TestPassword:
         assert Password("x" * Password.MAX_LEN).value == "x" * Password.MAX_LEN
 
     def test_rejects_password_shorter_than_minimum_length(self) -> None:
-        with pytest.raises(ValueError, match="at least"):
+        with pytest.raises(InvalidValue, match="at least"):
             Password("x" * (Password.MIN_LEN - 1))
 
     def test_rejects_password_longer_than_maximum_length(self) -> None:
-        with pytest.raises(ValueError, match="at most"):
+        with pytest.raises(InvalidValue, match="at most"):
             Password("x" * (Password.MAX_LEN + 1))

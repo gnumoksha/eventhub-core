@@ -120,7 +120,7 @@ class IdentityService:
     async def login(
         self,
         email: Email,
-        password: str,
+        password: Password,
         client_ip: str,
         *,
         now: datetime | None = None,
@@ -130,7 +130,7 @@ class IdentityService:
         account = await self._repository.get_account_by_email(email)
         account_is_active = account is not None and account.deactivated_at is None
         stored_hash = account.password_hash if account_is_active and account else DUMMY_PASSWORD_HASH
-        verified = await run_in_threadpool(password_hash.verify, password, stored_hash)
+        verified = await run_in_threadpool(password_hash.verify, password.value, stored_hash)
         if not account_is_active or not verified:
             await self._throttle.failed(email, client_ip)
             raise AuthenticationError

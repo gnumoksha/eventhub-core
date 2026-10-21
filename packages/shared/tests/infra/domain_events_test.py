@@ -6,7 +6,7 @@ import pytest
 from aio_pika import ExchangeType
 from libs.events import Metadata, PublishableEvent, SerializableDict, listener
 from libs.events.listener import _listeners
-from shared.infra.domain_events import EXCHANGE, declare_context_queue, declare_events_exchange
+from shared.infra.domain_events import EXCHANGE, __declare_context_queue, __declare_events_exchange
 
 pytestmark = pytest.mark.asyncio
 
@@ -57,7 +57,7 @@ def make_channel() -> FakeChannel:
 async def test_events_exchange_is_a_topic_with_an_alternate_exchange_for_unrouted_events():
     channel = make_channel()
 
-    await declare_events_exchange(channel)  # ty: ignore[invalid-argument-type]
+    await __declare_events_exchange(channel)  # ty: ignore[invalid-argument-type]
 
     channel.declare_exchange.assert_any_await(
         EXCHANGE, ExchangeType.TOPIC, durable=True, arguments={"alternate-exchange": f"{EXCHANGE}.unrouted"}
@@ -75,7 +75,7 @@ async def test_context_queue_is_bound_only_to_the_events_with_listeners():
 
     channel = make_channel()
 
-    await declare_context_queue(channel, "sales")  # ty: ignore[invalid-argument-type]
+    await __declare_context_queue(channel, "sales")  # ty: ignore[invalid-argument-type]
 
     queue_names = [call.args[0] for call in channel.declare_queue.await_args_list]
     assert queue_names == ["sales.events.dlq", f"{EXCHANGE}.unrouted", "sales.events"]
@@ -89,6 +89,6 @@ async def test_context_queue_is_bound_only_to_the_events_with_listeners():
 async def test_context_queue_without_listeners_has_no_bindings():
     channel = make_channel()
 
-    await declare_context_queue(channel, "checkin")  # ty: ignore[invalid-argument-type]
+    await __declare_context_queue(channel, "checkin")  # ty: ignore[invalid-argument-type]
 
     channel.queues["checkin.events"].bind.assert_not_awaited()

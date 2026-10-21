@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field, field_validator
+from shared.domain.errors import InvalidValue
 from shared.settings import settings
 
 from identity.application.authentication import (
@@ -32,7 +33,7 @@ class CredentialsInput(BaseModel):
     def validate_email(cls, value: str) -> str:
         try:
             return Email(value).value
-        except ValueError as exc:
+        except InvalidValue as exc:
             raise ValueError("Enter a valid email address") from exc
 
 
@@ -44,7 +45,7 @@ class EmailInput(BaseModel):
     def validate_email(cls, value: str) -> str:
         try:
             return Email(value).value
-        except ValueError as exc:
+        except InvalidValue as exc:
             raise ValueError("Enter a valid email address") from exc
 
 
@@ -116,7 +117,12 @@ async def signup(
     _origin: TrustedOriginDep,
 ) -> MessageOutput:
     try:
-        _, session, raw_token = await service.signup(Email(input_.email), Password(input_.password))
+        _, session, raw_token = await service.signup(
+            Email(input_.email),
+            Password(input_.password),
+        )
+    except InvalidValue as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     except DuplicateAccountEmail:
         pass
     else:
@@ -138,11 +144,14 @@ async def login(
     try:
         account, session, raw_token = await service.login(
             Email(input_.email),
-            input_.password,
+            Password(input_.password),
             client_ip,
         )
+    except InvalidValue as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     except AuthenticationError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password") from exc
+
     _set_session_cookie(response, raw_token, session.expires_at)
     return SessionOutput(account=_account_output(account), csrf_token=_csrf_for(raw_token))
 
