@@ -44,3 +44,14 @@ class TestPassword:
     def test_rejects_password_longer_than_maximum_length(self) -> None:
         with pytest.raises(InvalidValue, match="at most"):
             Password("x" * (Password.MAX_LEN + 1))
+
+    def test_from_trusted_skips_validation_and_preserves_value(self) -> None:
+        password = Password.from_trusted(v := "x" * (Password.MIN_LEN - 1))
+
+        assert password.value == v
+
+    def test_is_immutable(self) -> None:
+        password = Password("x" * Password.MIN_LEN)
+
+        with pytest.raises(AttributeError):
+            setattr(password, "value", "x" * Password.MIN_LEN)

@@ -48,3 +48,9 @@ class Password:
             raise InvalidValue(f"Password must contain at least {self.MIN_LEN} characters")
         if len(self.value) > self.MAX_LEN:
             raise InvalidValue(f"Password must contain at most {self.MAX_LEN} characters")
+
+    @classmethod
+    def from_trusted(cls, value: str) -> Self:
+        password = cls.__new__(cls)
+        object.__setattr__(password, "value", value)
+        return password

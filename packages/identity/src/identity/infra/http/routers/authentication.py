@@ -36,6 +36,14 @@ class CredentialsInput(BaseModel):
         except InvalidValue as exc:
             raise ValueError("Enter a valid email address") from exc
 
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        try:
+            return Password(value).value
+        except InvalidValue as exc:
+            raise ValueError("Enter a valid password") from exc
+
 
 class EmailInput(BaseModel):
     email: str = Field(max_length=320)
@@ -118,8 +126,8 @@ async def signup(
 ) -> MessageOutput:
     try:
         _, session, raw_token = await service.signup(
-            Email(input_.email),
-            Password(input_.password),
+            Email.from_trusted(input_.email),  # already validated on CredentialsInput
+            Password.from_trusted(input_.password),  # already validated on CredentialsInput
         )
     except DuplicateAccountEmail:
         pass
@@ -141,8 +149,8 @@ async def login(
     client_ip = request.client.host if request.client else "unknown"
     try:
         account, session, raw_token = await service.login(
-            Email(input_.email),
-            Password(input_.password),
+            Email.from_trusted(input_.email),  # already validated on CredentialsInput
+            Password.from_trusted(input_.password),  # already validated on CredentialsInput
             client_ip,
         )
     except AuthenticationError as exc:

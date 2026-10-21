@@ -23,7 +23,6 @@ from aio_pika import ExchangeType
 from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractQueue
 from fastapi import Depends
 from libs.events import (
-    Dispatcher,
     JsonDecoder,
     JsonEncoder,
     LocalDispatcher,
