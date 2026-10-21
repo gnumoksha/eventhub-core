@@ -15,6 +15,8 @@ async def _send_email(recipient: str, subject: str, body: str, idempotency_key: 
             return
         raise RuntimeError("RESEND_API_KEY must be configured to deliver authentication emails")
 
+    logger.info("_send_email: sending email")
+
     resend.api_key = settings.RESEND_API_KEY.get_secret_value()
 
     params: resend.Emails.SendParams = {
@@ -29,6 +31,8 @@ async def _send_email(recipient: str, subject: str, body: str, idempotency_key: 
     }
 
     await resend.Emails.send_async(params, options)
+
+    logger.info("_send_email: email has been sent")
 
 
 @listener(AccountVerificationRequested)

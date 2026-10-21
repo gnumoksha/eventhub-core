@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     PUBLIC_URL: str
 
     RESEND_API_KEY: SecretStr | None = None
-    NOTIFICATIONS_FROM_EMAIL: str = "no-reply@eventhub.tobias.ws"
+    NOTIFICATIONS_FROM_EMAIL: str = "Eventhub <no-reply@example.com>"
 
     DATABASE_URL: PostgresDsn
 
