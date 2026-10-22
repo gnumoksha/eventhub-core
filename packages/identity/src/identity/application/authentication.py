@@ -60,7 +60,7 @@ class LoginThrottle:
 
     async def failed(self, email: Email, client_ip: str) -> None:
         key = self._key(email, client_ip)
-        failures = await self._redis.incr(f"{key}:failures")
+        failures = await self._redis.incrby(f"{key}:failures")
         if failures == 1:
             await self._redis.expire(f"{key}:failures", LOGIN_WINDOW_SECONDS)
         if failures >= LOGIN_FAILURE_LIMIT:
