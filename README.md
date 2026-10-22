@@ -64,7 +64,7 @@ You need Docker and Docker Compose installed. Compose starts the API and its inf
 docker compose up -d
 ```
 
-The API is available at `http://localhost:8000`. In development, the OpenAPI document is available at `http://localhost:8000/openapi.json`.
+The API is available at `http://localhost:8000`. In development, the OpenAPI document is available at `http://localhost:8000/openapi.json` and the GUI is at `http://localhost:8000/docs`.
 
 To stop the services:
 
@@ -101,4 +101,4 @@ Always set `APP_ENV=test` when running tests so they use the test database, whic
 
 - [Architecture and context map](var/docs/bounded_contexts.md)
 - [Roadmap](var/docs/roadmap.md)
-- [Architecture decision records (ADRs)](packages/)
+- [Architecture decision records (ADRs)](packages/identity/var/docs) in `packages/**/var/docs/`

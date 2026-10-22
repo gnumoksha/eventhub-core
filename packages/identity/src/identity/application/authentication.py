@@ -127,8 +127,10 @@ class IdentityService:
     ) -> tuple[Account, Session, str]:
         now = now or datetime.now(UTC)
         await self._throttle.check(email, client_ip)
+
         account = await self._repository.get_account_by_email(email)
         account_is_active = account is not None and account.deactivated_at is None
+        # always calculate the hash to stop account enumeration through response timing.
         stored_hash = account.password_hash if account_is_active and account else DUMMY_PASSWORD_HASH
         verified = await run_in_threadpool(password_hash.verify, password.value, stored_hash)
         if not account_is_active or not verified:

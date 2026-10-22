@@ -1,9 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  printf 'Usage: %s <environment>\n' "${0##*/}"
+  printf 'Deploy the latest image to the specified Kubernetes namespace.\n'
+}
+
+environment="${1:-}"
+if [[ -z "$environment" ]]; then
+  usage >&2
+  exit 2
+fi
+if [[ "$environment" != "production" && "$environment" != "staging" ]]; then
+  printf 'Error: environment must be either "production" or "staging".\n' >&2
+  usage >&2
+  exit 2
+fi
+
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$script_dir/.." && pwd)"
-deploy_dir="$repo_root/var/kubernetes/production"
+deploy_dir="$repo_root/var/kubernetes/$environment"
 secrets_file="$deploy_dir/app-secrets.env"
 kustomization_file="$deploy_dir/kustomization.yaml"
 registry_repository="gnumoksha/eventhub-core"
@@ -73,15 +89,16 @@ printf 'Deploying image %s@%s to Kubernetes context: %s\n' "$registry_image" "$i
 kubectl apply -k "$deploy_dir"
 
 printf 'Waiting for PostgreSQL, RabbitMQ, and Redis...\n'
-kubectl -n production rollout status statefulset/postgresql --timeout="$rollout_timeout"
-kubectl -n production rollout status statefulset/rabbitmq --timeout="$rollout_timeout"
-kubectl -n production rollout status deployment/redis --timeout="$rollout_timeout"
+kubectl -n "$environment" rollout status statefulset/postgresql --timeout="$rollout_timeout"
+kubectl -n "$environment" rollout status statefulset/rabbitmq --timeout="$rollout_timeout"
+kubectl -n "$environment" rollout status deployment/redis --timeout="$rollout_timeout"
 
 printf 'Waiting for the API before running database migrations...\n'
-kubectl -n production rollout status deployment/eventhub-web --timeout="$rollout_timeout"
-kubectl -n production exec deployment/eventhub-web -- alembic upgrade head
+kubectl -n "$environment" rollout status deployment/eventhub-web --timeout="$rollout_timeout"
+kubectl -n "$environment" exec deployment/eventhub-web -- alembic upgrade head
 
 printf 'Waiting for the outbox relay...\n'
-kubectl -n production rollout status deployment/outbox-relay --timeout="$rollout_timeout"
+kubectl -n "$environment" rollout status deployment/outbox-relay --timeout="$rollout_timeout"
+kubectl -n "$environment" rollout status deployment/notifications-consumer --timeout="$rollout_timeout"
 
 printf 'Deployment completed.\n'
