@@ -75,6 +75,9 @@ class Settings(BaseSettings):
         """Whether the application is running in a dev-like environment."""
         return self.APP_ENV in ("development", "test")
 
+    def is_dev_or_staging(self) -> bool:
+        return self.APP_ENV in ("development", "staging")
+
     def is_prod(self) -> bool:
         """Whether the application is running in a production environment."""
         return self.APP_ENV == "production"
