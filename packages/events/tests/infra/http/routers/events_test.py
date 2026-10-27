@@ -47,9 +47,7 @@ def event_payload() -> dict:
 
 
 def create_event(client: TestClient, organization_id: uuid.UUID | None = None) -> dict:
-    response = client.post(
-        f"/organizations/{organization_id or uuid.uuid4()}/events", json=event_payload()
-    )
+    response = client.post(f"/organizations/{organization_id or uuid.uuid4()}/events", json=event_payload())
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -91,9 +89,7 @@ def test_list_organization_events(client: TestClient):
     create_event(client, organization_id)
     client.post(f"/events/{first['id']}/publish")
 
-    response = client.get(
-        f"/organizations/{organization_id}/events", params={"status": "PUBLISHED"}
-    )
+    response = client.get(f"/organizations/{organization_id}/events", params={"status": "PUBLISHED"})
 
     assert response.status_code == 200
     assert [e["id"] for e in response.json()] == [first["id"]]

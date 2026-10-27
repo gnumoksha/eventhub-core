@@ -109,9 +109,7 @@ class IdentityService:
             credential,
             session,
             events=[
-                AccountVerificationRequested(
-                    account.email, encrypt_authentication_token(token)
-                ),
+                AccountVerificationRequested(account.email, encrypt_authentication_token(token)),
                 AccountLoggedIn(account.id, is_new_account=True),
             ],
         )
@@ -131,14 +129,8 @@ class IdentityService:
         account = await self._repository.get_account_by_email(email)
         account_is_active = account is not None and account.deactivated_at is None
         # always calculate the hash to stop account enumeration through response timing.
-        stored_hash = (
-            account.password_hash
-            if account_is_active and account
-            else DUMMY_PASSWORD_HASH
-        )
-        verified = await run_in_threadpool(
-            password_hash.verify, password.value, stored_hash
-        )
+        stored_hash = account.password_hash if account_is_active and account else DUMMY_PASSWORD_HASH
+        verified = await run_in_threadpool(password_hash.verify, password.value, stored_hash)
         if not account_is_active or not verified:
             await self._throttle.failed(email, client_ip)
             raise AuthenticationError
@@ -146,14 +138,10 @@ class IdentityService:
 
         await self._throttle.succeeded(email, client_ip)
         session, raw_session_token = self._new_session(account.id, now)
-        await self._repository.save(
-            session, events=[AccountLoggedIn(account.id, is_new_account=False)]
-        )
+        await self._repository.save(session, events=[AccountLoggedIn(account.id, is_new_account=False)])
         return account, session, raw_session_token
 
-    async def authenticate_session(
-        self, token: str, *, now: datetime | None = None
-    ) -> tuple[Session, Account] | None:
+    async def authenticate_session(self, token: str, *, now: datetime | None = None) -> tuple[Session, Account] | None:
         now = now or datetime.now(UTC)
         return await self._repository.get_authenticated_session(_token_hash(token), now)
 
@@ -162,25 +150,15 @@ class IdentityService:
         await self._repository.save()
 
     async def verify_email(self, token: str, *, now: datetime | None = None) -> Account:
-        return await self._consume_credential(
-            token, CredentialPurpose.EMAIL_VERIFICATION, now=now
-        )
+        return await self._consume_credential(token, CredentialPurpose.EMAIL_VERIFICATION, now=now)
 
-    async def request_verification(
-        self, email: Email, *, now: datetime | None = None
-    ) -> None:
+    async def request_verification(self, email: Email, *, now: datetime | None = None) -> None:
         now = now or datetime.now(UTC)
         account = await self._repository.get_account_by_email(email)
-        if (
-            account is None
-            or account.email_verified_at is not None
-            or account.deactivated_at is not None
-        ):
+        if account is None or account.email_verified_at is not None or account.deactivated_at is not None:
             return
 
-        await self._revoke_credentials(
-            account.id, CredentialPurpose.EMAIL_VERIFICATION, now=now
-        )
+        await self._revoke_credentials(account.id, CredentialPurpose.EMAIL_VERIFICATION, now=now)
         token = _new_token()
         credential = AccountCredential(
             account_id=account.id,
@@ -190,23 +168,15 @@ class IdentityService:
         )
         await self._repository.save(
             credential,
-            events=[
-                AccountVerificationRequested(
-                    account.email, encrypt_authentication_token(token)
-                )
-            ],
+            events=[AccountVerificationRequested(account.email, encrypt_authentication_token(token))],
         )
 
-    async def request_password_reset(
-        self, email: Email, *, now: datetime | None = None
-    ) -> None:
+    async def request_password_reset(self, email: Email, *, now: datetime | None = None) -> None:
         now = now or datetime.now(UTC)
         account = await self._repository.get_account_by_email(email)
         if account is None or account.deactivated_at is not None:
             return
-        await self._revoke_credentials(
-            account.id, CredentialPurpose.PASSWORD_RESET, now=now
-        )
+        await self._revoke_credentials(account.id, CredentialPurpose.PASSWORD_RESET, now=now)
         token = _new_token()
         credential = AccountCredential(
             account_id=account.id,
@@ -216,23 +186,13 @@ class IdentityService:
         )
         await self._repository.save(
             credential,
-            events=[
-                PasswordResetRequested(
-                    account.email, encrypt_authentication_token(token)
-                )
-            ],
+            events=[PasswordResetRequested(account.email, encrypt_authentication_token(token))],
         )
 
-    async def reset_password(
-        self, token: str, new_password: str, *, now: datetime | None = None
-    ) -> Account:
+    async def reset_password(self, token: str, new_password: str, *, now: datetime | None = None) -> Account:
         Password(new_password)
-        account = await self._consume_credential(
-            token, CredentialPurpose.PASSWORD_RESET, now=now, commit=False
-        )
-        account.password_hash = await run_in_threadpool(
-            password_hash.hash, new_password
-        )
+        account = await self._consume_credential(token, CredentialPurpose.PASSWORD_RESET, now=now, commit=False)
+        account.password_hash = await run_in_threadpool(password_hash.hash, new_password)
         await self._revoke_sessions(account.id, now=now)
         await self._repository.save()
         return account
@@ -246,13 +206,9 @@ class IdentityService:
         now: datetime | None = None,
     ) -> None:
         Password(new_password)
-        if not await run_in_threadpool(
-            password_hash.verify, current_password, account.password_hash
-        ):
+        if not await run_in_threadpool(password_hash.verify, current_password, account.password_hash):
             raise AuthenticationError
-        account.password_hash = await run_in_threadpool(
-            password_hash.hash, new_password
-        )
+        account.password_hash = await run_in_threadpool(password_hash.hash, new_password)
         await self._revoke_sessions(account.id, now=now)
         await self._repository.save()
 
@@ -265,9 +221,7 @@ class IdentityService:
         commit: bool = True,
     ) -> Account:
         now = now or datetime.now(UTC)
-        credential = await self._repository.get_credential_for_update(
-            _token_hash(token), purpose, now
-        )
+        credential = await self._repository.get_credential_for_update(_token_hash(token), purpose, now)
         if credential is None:
             raise InvalidCredentialToken
         account = await self._repository.get_account(credential.account_id)
@@ -287,15 +241,11 @@ class IdentityService:
         *,
         now: datetime,
     ) -> None:
-        credentials = await self._repository.get_unconsumed_credentials(
-            account_id, purpose
-        )
+        credentials = await self._repository.get_unconsumed_credentials(account_id, purpose)
         for credential in credentials:
             credential.consumed_at = now
 
-    async def _revoke_sessions(
-        self, account_id: uuid.UUID, *, now: datetime | None = None
-    ) -> None:
+    async def _revoke_sessions(self, account_id: uuid.UUID, *, now: datetime | None = None) -> None:
         revoked_at = now or datetime.now(UTC)
         sessions = await self._repository.get_active_sessions(account_id)
         for session in sessions:
@@ -315,9 +265,7 @@ class IdentityService:
 
 
 def csrf_token(session_token: str, secret: str) -> str:
-    return hmac.new(
-        secret.encode(), f"eventhub-csrf:{session_token}".encode(), hashlib.sha256
-    ).hexdigest()
+    return hmac.new(secret.encode(), f"eventhub-csrf:{session_token}".encode(), hashlib.sha256).hexdigest()
 
 
 def verify_csrf_token(session_token: str, secret: str, supplied: str | None) -> bool:
