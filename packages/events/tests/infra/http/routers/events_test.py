@@ -47,7 +47,9 @@ def event_payload() -> dict:
 
 
 def create_event(client: TestClient, organization_id: uuid.UUID | None = None) -> dict:
-    response = client.post(f"/organizations/{organization_id or uuid.uuid4()}/events", json=event_payload())
+    response = client.post(
+        f"/organizations/{organization_id or uuid.uuid4()}/events", json=event_payload()
+    )
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -71,7 +73,10 @@ def test_full_lifecycle(client: TestClient):
 
     postponed = client.post(
         f"/events/{event_id}/postpone",
-        json={"start_at": new_start.isoformat(), "end_at": (new_start + timedelta(hours=6)).isoformat()},
+        json={
+            "start_at": new_start.isoformat(),
+            "end_at": (new_start + timedelta(hours=6)).isoformat(),
+        },
     )
     assert postponed.json()["status"] == "POSTPONED"
 
@@ -86,7 +91,9 @@ def test_list_organization_events(client: TestClient):
     create_event(client, organization_id)
     client.post(f"/events/{first['id']}/publish")
 
-    response = client.get(f"/organizations/{organization_id}/events", params={"status": "PUBLISHED"})
+    response = client.get(
+        f"/organizations/{organization_id}/events", params={"status": "PUBLISHED"}
+    )
 
     assert response.status_code == 200
     assert [e["id"] for e in response.json()] == [first["id"]]
@@ -95,10 +102,16 @@ def test_list_organization_events(client: TestClient):
 def test_change_venue_to_online(client: TestClient):
     event_id = create_event(client)["id"]
 
-    response = client.put(f"/events/{event_id}/venue", json={"type": "online", "url": "https://meet.example.com/x"})
+    response = client.put(
+        f"/events/{event_id}/venue",
+        json={"type": "online", "url": "https://meet.example.com/x"},
+    )
 
     assert response.status_code == 200
-    assert response.json()["venue"] == {"type": "online", "url": "https://meet.example.com/x"}
+    assert response.json()["venue"] == {
+        "type": "online",
+        "url": "https://meet.example.com/x",
+    }
 
 
 def test_invalid_state_transition_returns_409(client: TestClient):

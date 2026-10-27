@@ -9,6 +9,15 @@ dependencies = [
     "redis>=8.1.0",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.16.9",
+    "ty>=0.0.84",
+]
+
 [tool.ruff]
 required-version = ">=0.8.0" # this is the version included with vscode extension
 line-length = 120
