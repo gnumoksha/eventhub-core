@@ -6,12 +6,14 @@ from shared.domain.errors import InvalidValue
 from shared.settings import settings
 
 from identity.application.authentication import (
-    AuthenticationError,
-    DuplicateAccountEmail,
-    InvalidCredentialToken,
     csrf_token,
 )
 from identity.domain.models.account.account import Account
+from identity.domain.models.account.errors import (
+    AuthenticationError,
+    DuplicateAccountEmail,
+    InvalidCredentialToken,
+)
 from identity.domain.models.values import Email, Password
 from identity.infra.http.authentication import (
     AuthenticatedSessionDep,
@@ -110,7 +112,11 @@ def _clear_session_cookie(response: Response) -> None:
 
 
 def _account_output(account: Account) -> AccountOutput:
-    return AccountOutput(id=str(account.id), email=account.email, email_verified=account.email_verified_at is not None)
+    return AccountOutput(
+        id=str(account.id),
+        email=account.email,
+        email_verified=account.email_verified_at is not None,
+    )
 
 
 def _csrf_for(token: str) -> str:
@@ -230,7 +236,10 @@ async def change_password(
     try:
         await service.change_password(auth.account, input_.current_password, input_.password)
     except AuthenticationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        ) from exc
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     _clear_session_cookie(response)
     return response

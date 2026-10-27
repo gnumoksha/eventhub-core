@@ -21,14 +21,16 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$script_dir/.." && pwd)"
 deploy_dir="$repo_root/var/kubernetes/$environment"
 secrets_file="$deploy_dir/app-secrets.env"
+rustfs_values_file="$deploy_dir/rustfs.yaml"
 kustomization_file="$deploy_dir/kustomization.yaml"
+rustfs_chart_version="1.0.1"
 registry_repository="gnumoksha/eventhub-core"
 registry_image="ghcr.io/$registry_repository"
 registry_token_url="https://ghcr.io/token?scope=repository%3A${registry_repository//\//%2F}%3Apull"
 registry_manifest_url="https://ghcr.io/v2/$registry_repository/manifests/latest"
 rollout_timeout="${ROLLOUT_TIMEOUT:-5m}"
 
-for command in kubectl curl jq python3; do
+for command in kubectl helm curl jq python3; do
   if ! command -v "$command" >/dev/null 2>&1; then
     printf 'Error: %s is required but was not found in PATH.\n' "$command" >&2
     exit 1
@@ -43,6 +45,23 @@ fi
 
 if grep -Eqi 'replace-with|change-me|todo' "$secrets_file"; then
   printf 'Error: app-secrets.env still contains example values.\n' >&2
+  exit 1
+fi
+
+if ! awk -F= '
+  $1 == "RUSTFS_ACCESS_KEY" {
+    access_key = substr($0, index($0, "=") + 1)
+    access_key_count++
+  }
+  $1 == "RUSTFS_SECRET_KEY" {
+    secret_key = substr($0, index($0, "=") + 1)
+    secret_key_count++
+  }
+  END {
+    exit !(access_key_count == 1 && secret_key_count == 1 && access_key != "" && secret_key != "" && access_key != secret_key)
+  }
+' "$secrets_file"; then
+  printf 'Error: app-secrets.env must contain distinct, non-empty RUSTFS_ACCESS_KEY and RUSTFS_SECRET_KEY values.\n' >&2
   exit 1
 fi
 
@@ -86,7 +105,27 @@ PY
 context="$(kubectl config current-context)"
 printf 'Deploying image %s@%s to Kubernetes context: %s\n' "$registry_image" "$image_digest" "$context"
 
+printf 'Refreshing RustFS Helm repository...\n'
+helm repo add rustfs https://charts.rustfs.com --force-update
+helm repo update rustfs
+
 kubectl apply -k "$deploy_dir"
+
+printf 'Creating the RustFS credentials Secret...\n'
+kubectl create secret generic rustfs-auth \
+  --namespace "$environment" \
+  --from-env-file=<(awk -F= '$1 == "RUSTFS_ACCESS_KEY" || $1 == "RUSTFS_SECRET_KEY" { print }' "$secrets_file") \
+  --dry-run=client \
+  --output=yaml \
+  | kubectl apply -f -
+
+printf 'Installing RustFS Helm chart version %s...\n' "$rustfs_chart_version"
+helm upgrade --install rustfs rustfs/rustfs \
+  --version "$rustfs_chart_version" \
+  --namespace "$environment" \
+  --values "$rustfs_values_file" \
+  --wait \
+  --timeout "$rollout_timeout"
 
 printf 'Waiting for PostgreSQL, RabbitMQ, and Redis...\n'
 kubectl -n "$environment" rollout status statefulset/postgresql --timeout="$rollout_timeout"

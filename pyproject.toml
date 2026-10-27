@@ -32,6 +32,7 @@ dependencies = [
     "ticketing",
     "uuid-utils>=1.0.0",
     "resend>=2.50.0",
+    "boto3>=1.43.118",
 ]
 
 [dependency-groups]

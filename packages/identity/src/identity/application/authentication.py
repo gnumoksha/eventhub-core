@@ -8,11 +8,27 @@ from fastapi.concurrency import run_in_threadpool
 from pwdlib import PasswordHash
 from redis.asyncio import Redis
 from shared.infra.authentication.token_encryption import encrypt_authentication_token
-from sqlalchemy.exc import IntegrityError
 
-from identity.domain.models.account.account import Account, AccountCredential, CredentialPurpose, Session
-from identity.domain.models.account.events import AccountLoggedIn, AccountVerificationRequested, PasswordResetRequested
-from identity.domain.models.account.repository import AccountRepository
+from identity.domain.models.account.account import (
+    Account,
+    AccountCredential,
+    CredentialPurpose,
+    Session,
+)
+from identity.domain.models.account.errors import (
+    AuthenticationError,
+    DuplicateAccountEmail,
+    InvalidCredentialToken,
+)
+from identity.domain.models.account.events import (
+    AccountLoggedIn,
+    AccountVerificationRequested,
+    PasswordResetRequested,
+)
+from identity.domain.models.account.repository import (
+    AccountEmailAlreadyExists,
+    AccountRepository,
+)
 from identity.domain.models.values import Email, Password
 
 SESSION_LIFETIME = timedelta(days=7)
@@ -23,18 +39,6 @@ LOGIN_BACKOFF_SECONDS = 15 * 60
 LOGIN_FAILURE_LIMIT = 3
 password_hash = PasswordHash.recommended()
 DUMMY_PASSWORD_HASH = password_hash.hash("eventhub-dummy-password")
-
-
-class AuthenticationError(Exception):
-    pass
-
-
-class InvalidCredentialToken(Exception):
-    pass
-
-
-class DuplicateAccountEmail(Exception):
-    pass
 
 
 def _token_hash(token: str) -> str:
@@ -90,14 +94,8 @@ class IdentityService:
         self._repository.add(account)
         try:
             await self._repository.flush()
-        except IntegrityError as exc:
-            await self._repository.rollback()
-            constraint_name = getattr(exc.orig, "constraint_name", None) or getattr(
-                getattr(exc.orig, "diag", None), "constraint_name", None
-            )
-            if constraint_name == "uq_identity_accounts_email":
-                raise DuplicateAccountEmail from exc
-            raise
+        except AccountEmailAlreadyExists as exc:
+            raise DuplicateAccountEmail from exc
 
         token = _new_token()
         credential = AccountCredential(
@@ -200,7 +198,12 @@ class IdentityService:
         return account
 
     async def change_password(
-        self, account: Account, current_password: str, new_password: str, *, now: datetime | None = None
+        self,
+        account: Account,
+        current_password: str,
+        new_password: str,
+        *,
+        now: datetime | None = None,
     ) -> None:
         Password(new_password)
         if not await run_in_threadpool(password_hash.verify, current_password, account.password_hash):
@@ -252,7 +255,11 @@ class IdentityService:
     def _new_session(account_id: uuid.UUID, now: datetime) -> tuple[Session, str]:
         token = _new_token()
         return (
-            Session(account_id=account_id, token_hash=_token_hash(token), expires_at=now + SESSION_LIFETIME),
+            Session(
+                account_id=account_id,
+                token_hash=_token_hash(token),
+                expires_at=now + SESSION_LIFETIME,
+            ),
             token,
         )
 
