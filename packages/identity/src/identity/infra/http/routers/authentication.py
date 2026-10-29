@@ -123,7 +123,9 @@ def _csrf_for(token: str) -> str:
     return csrf_token(token, settings.APP_SECRET.get_secret_value())
 
 
-@router.post("/signup", status_code=status.HTTP_202_ACCEPTED, response_model=MessageOutput)
+@router.post(
+    "/signup", status_code=status.HTTP_202_ACCEPTED, response_model=MessageOutput
+)
 async def signup(
     input_: CredentialsInput,
     response: Response,
@@ -133,7 +135,9 @@ async def signup(
     try:
         _, session, raw_token = await service.signup(
             Email.from_trusted(input_.email),  # already validated on CredentialsInput
-            Password.from_trusted(input_.password),  # already validated on CredentialsInput
+            Password.from_trusted(
+                input_.password
+            ),  # already validated on CredentialsInput
         )
     except DuplicateAccountEmail:
         pass
@@ -141,7 +145,9 @@ async def signup(
         _set_session_cookie(response, raw_token, session.expires_at)
     # A new account gets a cookie; the response body never reveals whether the
     # normalized address already existed. The client fetches /identity/csrf.
-    return MessageOutput(message="If the address can be registered, verification instructions will be sent")
+    return MessageOutput(
+        message="If the address can be registered, verification instructions will be sent"
+    )
 
 
 @router.post("/login", response_model=SessionOutput)
@@ -156,18 +162,26 @@ async def login(
     try:
         account, session, raw_token = await service.login(
             Email.from_trusted(input_.email),  # already validated on CredentialsInput
-            Password.from_trusted(input_.password),  # already validated on CredentialsInput
+            Password.from_trusted(
+                input_.password
+            ),  # already validated on CredentialsInput
             client_ip,
         )
     except AuthenticationError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password") from exc
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+        ) from exc
 
     _set_session_cookie(response, raw_token, session.expires_at)
-    return SessionOutput(account=_account_output(account), csrf_token=_csrf_for(raw_token))
+    return SessionOutput(
+        account=_account_output(account), csrf_token=_csrf_for(raw_token)
+    )
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(auth: AuthenticatedSessionDep, service: IdentityServiceDep, _csrf: CSRFDep) -> Response:
+async def logout(
+    auth: AuthenticatedSessionDep, service: IdentityServiceDep, _csrf: CSRFDep
+) -> Response:
     await service.logout(auth.session)
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     _clear_session_cookie(response)
@@ -180,16 +194,22 @@ async def me(auth: AuthenticatedSessionDep) -> AccountOutput:
 
 
 @router.get("/csrf")
-async def get_csrf(auth: AuthenticatedSessionDep, _origin: TrustedOriginDep) -> dict[str, str]:
+async def get_csrf(
+    auth: AuthenticatedSessionDep, _origin: TrustedOriginDep
+) -> dict[str, str]:
     return {"csrf_token": _csrf_for(auth.raw_token)}
 
 
 @router.post("/verify-email", response_model=MessageOutput)
-async def verify_email(input_: TokenInput, service: IdentityServiceDep, _origin: TrustedOriginDep) -> MessageOutput:
+async def verify_email(
+    input_: TokenInput, service: IdentityServiceDep, _origin: TrustedOriginDep
+) -> MessageOutput:
     try:
         await service.verify_email(input_.token)
     except InvalidCredentialToken as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
+        ) from exc
     return MessageOutput(message="Email verified")
 
 
@@ -200,7 +220,9 @@ async def resend_verification(
     _csrf: CSRFDep,
 ) -> MessageOutput:
     await service.request_verification(Email(auth.account.email))
-    return MessageOutput(message="If the account needs verification, an email will be sent")
+    return MessageOutput(
+        message="If the account needs verification, an email will be sent"
+    )
 
 
 @router.post("/password-reset", response_model=MessageOutput)
@@ -210,7 +232,9 @@ async def request_password_reset(
     _origin: TrustedOriginDep,
 ) -> MessageOutput:
     await service.request_password_reset(Email(input_.email))
-    return MessageOutput(message="If the account exists, a password reset email will be sent")
+    return MessageOutput(
+        message="If the account exists, a password reset email will be sent"
+    )
 
 
 @router.post("/password-reset/confirm", response_model=MessageOutput)
@@ -222,7 +246,9 @@ async def confirm_password_reset(
     try:
         await service.reset_password(input_.token, input_.password)
     except InvalidCredentialToken as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
+        ) from exc
     return MessageOutput(message="Password updated; please log in again")
 
 
@@ -234,7 +260,9 @@ async def change_password(
     _csrf: CSRFDep,
 ) -> Response:
     try:
-        await service.change_password(auth.account, input_.current_password, input_.password)
+        await service.change_password(
+            auth.account, input_.current_password, input_.password
+        )
     except AuthenticationError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
