@@ -8,7 +8,7 @@ dependencies = [
 ]
 
 [tool.ruff]
-required-version = ">=0.8.0" # this is the version included with vscode extension
+required-version = ">=0.17.0" # this is the version included with vscode extension
 line-length = 120
 # Explicitly set the source to the current directory.
 # When other configurations `extend` this one, they'll

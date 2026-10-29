@@ -1,0 +1,5 @@
+# ruff configuration for routers/ directories.
+# Create a symlink to this file in each routers/ directory to apply these settings.
+[lint.pylint]
+max-args = 10
+max-positional-args = 10

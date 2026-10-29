@@ -38,7 +38,7 @@ async def _send_email(recipient: str, subject: str, body: str, idempotency_key: 
 @listener(AccountVerificationRequested)
 async def send_verification_email(event: AccountVerificationRequested) -> None:
     token = decrypt_authentication_token(event.encrypted_token)
-    url = f"{settings.PUBLIC_URL.rstrip('/')}/verify-email?token={quote(token)}"
+    url = f"{settings.PUBLIC_FRONTEND_URL.rstrip('/')}/verify-email?token={quote(token)}"
     await _send_email(
         event.email,
         "Verify your Eventhub email",
@@ -50,7 +50,7 @@ async def send_verification_email(event: AccountVerificationRequested) -> None:
 @listener(PasswordResetRequested)
 async def send_password_reset_email(event: PasswordResetRequested) -> None:
     token = decrypt_authentication_token(event.encrypted_token)
-    url = f"{settings.PUBLIC_URL.rstrip('/')}/reset-password?token={quote(token)}"
+    url = f"{settings.PUBLIC_FRONTEND_URL.rstrip('/')}/reset-password?token={quote(token)}"
     await _send_email(
         event.email,
         "Reset your Eventhub password",

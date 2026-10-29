@@ -1,21 +1,24 @@
+import json
 import uuid
 from datetime import timedelta
 
 import pytest
+from events.application.event.image import __get_service as __get_image_service
 from events.application.event.service import EventService, __get_service
 from events.infra.http.routers.setup import setup_routers
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from identity.infra.http.authentication import require_account_id, require_csrf
 
-from tests.conftest import NOW
+from tests.conftest import NOW, InMemoryEventImageService
 
 
 @pytest.fixture
-def client(service: EventService) -> TestClient:
+def client(service: EventService, image_service: InMemoryEventImageService) -> TestClient:
     app = FastAPI()
     setup_routers(app)
     app.dependency_overrides[__get_service] = lambda: service
+    app.dependency_overrides[__get_image_service] = lambda: image_service
     app.dependency_overrides[require_account_id] = lambda: uuid.uuid4()  # noqa: PLW0108
     app.dependency_overrides[require_csrf] = lambda: None
     return TestClient(app)
@@ -47,7 +50,10 @@ def event_payload() -> dict:
 
 
 def create_event(client: TestClient, organization_id: uuid.UUID | None = None) -> dict:
-    response = client.post(f"/organizations/{organization_id or uuid.uuid4()}/events", json=event_payload())
+    response = client.post(
+        f"/organizations/{organization_id or uuid.uuid4()}/events",
+        data={"event": json.dumps(event_payload())},
+    )
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -71,7 +77,10 @@ def test_full_lifecycle(client: TestClient):
 
     postponed = client.post(
         f"/events/{event_id}/postpone",
-        json={"start_at": new_start.isoformat(), "end_at": (new_start + timedelta(hours=6)).isoformat()},
+        json={
+            "start_at": new_start.isoformat(),
+            "end_at": (new_start + timedelta(hours=6)).isoformat(),
+        },
     )
     assert postponed.json()["status"] == "POSTPONED"
 
@@ -94,11 +103,19 @@ def test_list_organization_events(client: TestClient):
 
 def test_change_venue_to_online(client: TestClient):
     event_id = create_event(client)["id"]
+    payload = event_payload()
+    payload["venue"] = {"type": "online", "url": "https://meet.example.com/x"}
 
-    response = client.put(f"/events/{event_id}/venue", json={"type": "online", "url": "https://meet.example.com/x"})
+    response = client.put(
+        f"/events/{event_id}",
+        json=payload,
+    )
 
     assert response.status_code == 200
-    assert response.json()["venue"] == {"type": "online", "url": "https://meet.example.com/x"}
+    assert response.json()["venue"] == {
+        "type": "online",
+        "url": "https://meet.example.com/x",
+    }
 
 
 def test_invalid_state_transition_returns_409(client: TestClient):
@@ -121,3 +138,36 @@ def test_invalid_domain_value_returns_422(client: TestClient):
 
 def test_unknown_event_returns_404(client: TestClient):
     assert client.get(f"/events/{uuid.uuid4()}").status_code == 404
+
+
+def test_create_event_with_banner(client: TestClient):
+    response = client.post(
+        f"/organizations/{uuid.uuid4()}/events",
+        data={"event": json.dumps(event_payload())},
+        files={"banner": ("banner.png", b"\x89PNG\r\n\x1a\nimage", "image/png")},
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["banner_url"].endswith("/1.png")
+    assert response.json()["id"] in response.json()["banner_url"]
+
+
+def test_replace_event_banner(client: TestClient):
+    created = create_event(client)
+    response = client.put(
+        f"/events/{created['id']}/banner",
+        files={"banner": ("banner.webp", b"RIFF0000WEBPdata", "image/webp")},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["banner_url"].endswith("/1.webp")
+
+
+def test_reject_banner_with_mismatched_signature(client: TestClient):
+    response = client.post(
+        f"/organizations/{uuid.uuid4()}/events",
+        data={"event": json.dumps(event_payload())},
+        files={"banner": ("banner.png", b"not png", "image/png")},
+    )
+
+    assert response.status_code == 415

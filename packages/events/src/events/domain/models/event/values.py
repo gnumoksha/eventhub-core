@@ -1,4 +1,4 @@
-# Value objects of the Event aggregate
+# Value objects for the Event aggregate.
 
 import re
 import uuid
@@ -106,3 +106,12 @@ class OnlineVenue:
 
 
 Venue = PhysicalVenue | OnlineVenue
+
+
+@dataclass(frozen=True, slots=True)
+class EventUpdate:
+    title: str
+    description: str
+    age_rating: AgeRating
+    venue: Venue | None
+    period: EventPeriod | None

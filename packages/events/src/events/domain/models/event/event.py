@@ -12,13 +12,20 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declared_attr, reconstructor
 from sqlmodel import Field, SQLModel
 
-from events.domain.models.event.events import EventCancelled, EventFinished, EventPostponed, EventPublished
+from events.domain.models.event.events import (
+    EventCancelled,
+    EventFinished,
+    EventPostponed,
+    EventPublished,
+    EventUpdated,
+)
 from events.domain.models.event.values import (
     Address,
     AgeRating,
     EventID,
     EventPeriod,
     EventStatus,
+    EventUpdate,
     OnlineVenue,
     OrganizationID,
     PhysicalVenue,
@@ -28,6 +35,7 @@ from events.domain.models.event.values import (
 TITLE_MAX_LENGTH = 100
 DESCRIPTION_MAX_LENGTH = 10_000
 CANCELLATION_REASON_MAX_LENGTH = 500
+BANNER_IMAGE_KEY_MAX_LENGTH = 512
 
 _EDITABLE_STATUSES = (EventStatus.DRAFT, EventStatus.PUBLISHED, EventStatus.POSTPONED)
 _ON_SALE_STATUSES = (EventStatus.PUBLISHED, EventStatus.POSTPONED)
@@ -60,6 +68,7 @@ class Event(SQLModel, table=True):
     start_at: datetime | None = None
     end_at: datetime | None = Field(default=None, index=True)
     cancellation_reason: str | None = Field(default=None, max_length=CANCELLATION_REASON_MAX_LENGTH)
+    banner_image_key: str | None = Field(default=None, max_length=BANNER_IMAGE_KEY_MAX_LENGTH)
     created_at: datetime
     updated_at: datetime
     version: int = 0
@@ -114,13 +123,48 @@ class Event(SQLModel, table=True):
             return None
         return EventPeriod(start_at=self.start_at, end_at=self.end_at)
 
-    def update_details(self, *, title: str, description: str, age_rating: AgeRating, now: datetime) -> None:
+    def update(self, event_update: EventUpdate, *, now: datetime) -> None:
+        """Replaces the editable event details while preserving lifecycle rules."""
         if self.status not in _EDITABLE_STATUSES:
             raise InvalidStateTransition(f"A {self.status} event cannot be edited")
 
-        self.title = _validate_title(title)
-        self.description = _validate_description(description)
-        self.age_rating = age_rating
+        title = _validate_title(event_update.title)
+        description = _validate_description(event_update.description)
+        venue_changed = event_update.venue != self.venue
+        period_changed = event_update.period != self.period
+
+        if self.status != EventStatus.DRAFT and venue_changed:
+            raise InvalidStateTransition("The venue can only be changed while the event is a draft")
+        if self.status != EventStatus.DRAFT and period_changed:
+            raise InvalidStateTransition("A published event can only be rescheduled by postponing it")
+
+        self.title = title
+        self.description = description
+        self.age_rating = event_update.age_rating
+        self._set_venue(event_update.venue)
+        self._set_period(event_update.period)
+        self._touch(now)
+        self._record(
+            EventUpdated(
+                self.id,
+                self.organization_id,
+                self.title,
+            )
+        )
+
+    def ensure_banner_image_change_allowed(self) -> None:
+        if self.status not in _EDITABLE_STATUSES:
+            raise InvalidStateTransition(f"A {self.status} event cannot change its banner image")
+
+    def set_banner_image(self, object_key: str, now: datetime) -> None:
+        self.ensure_banner_image_change_allowed()
+        object_key = object_key.strip()
+        if not object_key:
+            raise InvalidValue("The banner image object key is required")
+        if len(object_key) > BANNER_IMAGE_KEY_MAX_LENGTH:
+            raise InvalidValue("The banner image object key is too long")
+
+        self.banner_image_key = object_key
         self._touch(now)
 
     def change_venue(self, venue: Venue, now: datetime) -> None:
@@ -154,11 +198,9 @@ class Event(SQLModel, table=True):
         self._touch(now)
         self._record(
             EventPublished(
-                event_id=self.id,
-                organization_id=self.organization_id,
-                title=self.title,
-                start_at=period.start_at,
-                end_at=period.end_at,
+                self.id,
+                self.organization_id,
+                self.title,
             )
         )
 

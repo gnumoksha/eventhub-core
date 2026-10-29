@@ -1,8 +1,9 @@
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import override
+from typing import BinaryIO, override
 
 import pytest
+from events.application.event.image import EventImageStorage
 from events.application.event.service import EventService
 from events.domain.models.event.event import Event
 from events.domain.models.event.repository import EventRepository
@@ -61,6 +62,29 @@ class InMemoryEventRepository(EventRepository):
         ][:limit]
 
 
+class InMemoryEventImageService(EventImageStorage):
+    def __init__(self) -> None:
+        self.objects: dict[str, bytes] = {}
+        self.deleted: list[str] = []
+        self.sequence = 0
+
+    def new_object_key(self, event_id: EventID, extension: str) -> str:
+        self.sequence += 1
+        return f"events/{event_id}/banners/{self.sequence}.{extension}"
+
+    def public_url(self, object_key: str) -> str:
+        return f"https://cdn.example.com/{object_key}"
+
+    async def upload(self, image: BinaryIO, object_key: str, *, content_type: str | None = None) -> str:
+        self.objects[object_key] = image.read()
+        _ = content_type
+        return object_key
+
+    async def delete(self, object_key: str) -> None:
+        self.deleted.append(object_key)
+        self.objects.pop(object_key, None)
+
+
 def make_period(days_from_now: int = 30, duration_hours: int = 4, now: datetime = NOW) -> EventPeriod:
     start_at = now + timedelta(days=days_from_now)
     return EventPeriod(start_at=start_at, end_at=start_at + timedelta(hours=duration_hours))
@@ -110,5 +134,18 @@ def clock() -> FakeClock:
 
 
 @pytest.fixture
-def service(repository: InMemoryEventRepository, clock: FakeClock) -> EventService:
-    return EventService(repository, clock)
+def image_service() -> InMemoryEventImageService:
+    return InMemoryEventImageService()
+
+
+@pytest.fixture
+def service(
+    repository: InMemoryEventRepository,
+    clock: FakeClock,
+    image_service: InMemoryEventImageService,
+) -> EventService:
+    return EventService(
+        repository=repository,
+        image_service=image_service,
+        clock=clock,
+    )

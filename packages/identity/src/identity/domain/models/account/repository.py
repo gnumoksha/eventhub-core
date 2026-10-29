@@ -7,11 +7,30 @@ from libs.events import PublishableEvent
 from shared.infra.database import SessionDep
 from shared.infra.di import Depends
 from shared.infra.outbox import add_to_outbox
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
 from identity.domain.models.account.account import Account, AccountCredential, CredentialPurpose, Session
 from identity.domain.models.values import Email
+
+
+class AccountEmailAlreadyExists(Exception):
+    """An account already uses the requested e-mail address."""
+
+
+def _get_constraint_name(error: BaseException | None) -> str | None:
+    current: BaseException | None = error
+    visited: set[int] = set()
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+        constraint_name = getattr(current, "constraint_name", None) or getattr(
+            getattr(current, "diag", None), "constraint_name", None
+        )
+        if constraint_name is not None:
+            return constraint_name
+        current = current.__cause__ or current.__context__
+    return None
 
 
 class AccountRepository:
@@ -82,10 +101,13 @@ class AccountRepository:
         self._session.add_all(entities)
 
     async def flush(self) -> None:
-        await self._session.flush()
-
-    async def rollback(self) -> None:
-        await self._session.rollback()
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            await self._session.rollback()
+            if _get_constraint_name(exc.orig) == "uq_identity_accounts_email":
+                raise AccountEmailAlreadyExists from exc
+            raise
 
     async def save(
         self,

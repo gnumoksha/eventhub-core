@@ -14,6 +14,7 @@ from events.domain.models.event.values import (
     AgeRating,
     EventPeriod,
     EventStatus,
+    EventUpdate,
     OnlineVenue,
     PhysicalVenue,
     Venue,
@@ -67,10 +68,21 @@ class CreateEventInput(BaseModel):
     period: PeriodSchema | None = None
 
 
-class UpdateEventDetailsInput(BaseModel):
+class UpdateEventInput(BaseModel):
     title: str = Field(max_length=100)
     description: str = Field(max_length=10_000)
     age_rating: AgeRating
+    venue: VenueSchema | None
+    period: PeriodSchema | None
+
+    def to_update(self) -> EventUpdate:
+        return EventUpdate(
+            title=self.title,
+            description=self.description,
+            age_rating=self.age_rating,
+            venue=self.venue.to_domain() if self.venue else None,
+            period=self.period.to_domain() if self.period else None,
+        )
 
 
 class CancelEventInput(BaseModel):
@@ -89,9 +101,10 @@ class EventOutput(BaseModel):
     cancellation_reason: str | None
     created_at: datetime
     updated_at: datetime
+    banner_url: str | None = None
 
     @classmethod
-    def from_domain(cls, event: Event) -> EventOutput:
+    def from_domain(cls, event: Event, *, banner_url: str | None = None) -> EventOutput:
         return cls(
             id=event.id,
             organization_id=event.organization_id,
@@ -104,6 +117,7 @@ class EventOutput(BaseModel):
             cancellation_reason=event.cancellation_reason,
             created_at=event.created_at,
             updated_at=event.updated_at,
+            banner_url=banner_url,
         )
 
 

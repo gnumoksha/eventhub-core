@@ -1,0 +1,40 @@
+# Values for the official rustfs/rustfs Helm chart. The chart version is pinned in bin/deploy.sh.
+fullnameOverride: rustfs
+
+replicaCount: 1
+
+mode:
+  standalone:
+    enabled: true
+  distributed:
+    enabled: false
+
+secret:
+  existingSecret: rustfs-auth
+
+storageclass:
+  name: local-path
+  dataStorageSize: 20Gi
+  logStorageSize: 1Gi
+
+config:
+  rustfs:
+    obs_environment: production
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: true
+  className: traefik
+  hosts:
+    - host: files.eventhub.tobias.ws
+      paths:
+        - path: /
+          pathType: Prefix
+          servicePort: endpoint
+  tls:
+    enabled: true
+    existingSecret:
+      enabled: true
+      name: rustfs-tls

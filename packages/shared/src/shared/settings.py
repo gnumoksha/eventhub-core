@@ -41,7 +41,10 @@ class Settings(BaseSettings):
     APP_DEBUG: bool = False
     APP_SECRET: SecretStr
     LOGGING_LEVEL: str = "INFO"
-    PUBLIC_URL: str
+    PUBLIC_API_URL: str
+    PUBLIC_FRONTEND_URL: str
+    CORS_ALLOWED_ORIGINS: str
+    CORS_ALLOW_ORIGIN_REGEX: str | None = None
 
     RESEND_API_KEY: SecretStr | None = None
     NOTIFICATIONS_FROM_EMAIL: str = "Eventhub <no-reply@example.com>"
@@ -49,12 +52,17 @@ class Settings(BaseSettings):
     DATABASE_URL: PostgresDsn
 
     SENTRY_DSN: HttpUrl | None = None
-    CORS_ALLOWED_ORIGINS: str
-    CORS_ALLOW_ORIGIN_REGEX: str | None = None
 
     REDIS_DSN: str = "redis://redis:6379/0"
     RABBITMQ_DSN: str = "amqp://eventhub:eventhub@rabbitmq:5672/%2F"
     QUEUE_RESULT_BACKEND_DSN: str = "redis://redis:6379/0"
+
+    S3_ENDPOINT_URL: str | None
+    S3_PUBLIC_BASE_URL: str
+    S3_REGION_NAME: str
+    S3_ACCESS_KEY: str
+    S3_SECRET_KEY: str
+    S3_BUCKET_EVENT_IMAGES: str = "event-images"
 
     def is_test(self) -> bool:
         """Whether the application is running in test environment."""
@@ -67,6 +75,9 @@ class Settings(BaseSettings):
     def is_dev_like(self) -> bool:
         """Whether the application is running in a dev-like environment."""
         return self.APP_ENV in ("development", "test")
+
+    def is_dev_or_staging(self) -> bool:
+        return self.APP_ENV in ("development", "staging")
 
     def is_prod(self) -> bool:
         """Whether the application is running in a production environment."""
