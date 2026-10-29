@@ -1,0 +1,8 @@
+# ruff configuration for bin/ directories.
+# Create a symlink to this file in each bin/ directory to apply these settings.
+extend = "../pyproject.toml"
+
+[lint]
+ignore = [
+    "T201", # print statement
+]
