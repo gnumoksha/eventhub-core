@@ -1,8 +1,8 @@
 from typing import Annotated
 
 from libs.time_utils import Clock, utc_now
-from packages.shared.src.shared.infra.logger import logger
 from shared.infra.di import Depends
+from shared.infra.logger import logger
 
 from events.application.event.image import EventBannerUpload, EventImageServiceDep, EventImageStorage
 from events.domain.models.event.event import Event
