@@ -35,7 +35,11 @@ _BANNER_FORMATS = {
 
 
 def _output(event: Event, image_service: EventImageStorage) -> EventOutput:
-    banner_url = image_service.public_url(event.banner_image_key) if event.banner_image_key else None
+    banner_url = (
+        image_service.public_url(event.banner_image_key)
+        if event.banner_image_key
+        else None
+    )
     return EventOutput.from_domain(event, banner_url=banner_url)
 
 
@@ -50,8 +54,12 @@ async def _read_banner(file: UploadFile) -> EventBannerUpload:
         raise HTTPException(status_code=413, detail="Banner must be at most 5 MiB")
 
     extension, signature = fmt
-    if not content.startswith(signature) or (content_type == "image/webp" and content[8:12] != b"WEBP"):
-        raise HTTPException(status_code=415, detail="Banner content does not match its image type")
+    if not content.startswith(signature) or (
+        content_type == "image/webp" and content[8:12] != b"WEBP"
+    ):
+        raise HTTPException(
+            status_code=415, detail="Banner content does not match its image type"
+        )
 
     return EventBannerUpload(BytesIO(content), content_type, extension)
 
@@ -96,12 +104,16 @@ async def list_organization_events(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[EventOutput]:
-    events = await service.list_by_organization(organization_id, status=status_, limit=limit, offset=offset)
+    events = await service.list_by_organization(
+        organization_id, status=status_, limit=limit, offset=offset
+    )
     return [_output(event, image_service) for event in events]
 
 
 @router.get("/events/{event_id}")
-async def get_event(event_id: EventID, service: EventServiceDep, image_service: EventImageServiceDep) -> EventOutput:
+async def get_event(
+    event_id: EventID, service: EventServiceDep, image_service: EventImageServiceDep
+) -> EventOutput:
     return _output(await service.get(event_id), image_service)
 
 
@@ -132,7 +144,9 @@ async def change_event_venue(
     _account_id: CurrentAccountID,
     _csrf: CSRFDep,
 ) -> EventOutput:
-    return _output(await service.change_venue(event_id, input_.to_domain()), image_service)
+    return _output(
+        await service.change_venue(event_id, input_.to_domain()), image_service
+    )
 
 
 @router.put("/events/{event_id}/period")
