@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     QUEUE_RESULT_BACKEND_DSN: str = "redis://redis:6379/0"
 
     S3_ENDPOINT_URL: str | None
+    S3_PUBLIC_BASE_URL: str
     S3_REGION_NAME: str
     S3_ACCESS_KEY: str
     S3_SECRET_KEY: str

@@ -28,6 +28,7 @@ from events.domain.models.event.values import (
 TITLE_MAX_LENGTH = 100
 DESCRIPTION_MAX_LENGTH = 10_000
 CANCELLATION_REASON_MAX_LENGTH = 500
+BANNER_IMAGE_KEY_MAX_LENGTH = 512
 
 _EDITABLE_STATUSES = (EventStatus.DRAFT, EventStatus.PUBLISHED, EventStatus.POSTPONED)
 _ON_SALE_STATUSES = (EventStatus.PUBLISHED, EventStatus.POSTPONED)
@@ -60,6 +61,7 @@ class Event(SQLModel, table=True):
     start_at: datetime | None = None
     end_at: datetime | None = Field(default=None, index=True)
     cancellation_reason: str | None = Field(default=None, max_length=CANCELLATION_REASON_MAX_LENGTH)
+    banner_image_key: str | None = Field(default=None, max_length=BANNER_IMAGE_KEY_MAX_LENGTH)
     created_at: datetime
     updated_at: datetime
     version: int = 0
@@ -121,6 +123,21 @@ class Event(SQLModel, table=True):
         self.title = _validate_title(title)
         self.description = _validate_description(description)
         self.age_rating = age_rating
+        self._touch(now)
+
+    def ensure_banner_image_change_allowed(self) -> None:
+        if self.status not in _EDITABLE_STATUSES:
+            raise InvalidStateTransition(f"A {self.status} event cannot change its banner image")
+
+    def set_banner_image(self, object_key: str, now: datetime) -> None:
+        self.ensure_banner_image_change_allowed()
+        object_key = object_key.strip()
+        if not object_key:
+            raise InvalidValue("The banner image object key is required")
+        if len(object_key) > BANNER_IMAGE_KEY_MAX_LENGTH:
+            raise InvalidValue("The banner image object key is too long")
+
+        self.banner_image_key = object_key
         self._touch(now)
 
     def change_venue(self, venue: Venue, now: datetime) -> None:

@@ -85,7 +85,7 @@ markers = [
 ]
 
 [tool.ruff]
-required-version = ">=0.8.0" # this is the version included with vscode extension
+required-version = ">=0.17.0" # this is the version included with vscode extension
 line-length = 120
 target-version = "py314"
 # Explicitly set the source to the current directory.
@@ -165,6 +165,7 @@ ignore = [
 ]
 
 [tool.ty.environment]
+# make ty find imports
 # https://github.com/astral-sh/ty/issues/2410#issuecomment-3728027729
 root = ["."]
 python = "./.venv"

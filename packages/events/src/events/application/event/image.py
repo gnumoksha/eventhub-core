@@ -1,29 +1,66 @@
 import json
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Annotated, BinaryIO
+from urllib.parse import quote
 
 import boto3
+import uuid_utils.compat as uuid_compat
 from botocore.client import BaseClient, Config
 from fastapi.concurrency import run_in_threadpool
 from shared.infra.di import Depends
 from shared.settings import Settings, SettingsDep
 
+from events.domain.models.event.values import EventID
 
-class EventImageService:
+
+@dataclass(frozen=True, slots=True)
+class EventBannerUpload:
+    image: BinaryIO
+    content_type: str
+    extension: str
+
+
+class EventImageStorage(ABC):
+    @abstractmethod
+    def new_object_key(self, event_id: EventID, extension: str) -> str: ...
+
+    @abstractmethod
+    def public_url(self, object_key: str) -> str: ...
+
+    @abstractmethod
+    async def upload(self, image: BinaryIO, object_key: str, *, content_type: str | None = None) -> str: ...
+
+    @abstractmethod
+    async def delete(self, object_key: str) -> None: ...
+
+
+class EventImageService(EventImageStorage):
     """Uploads event images to the configured S3-compatible storage."""
 
     def __init__(self, settings: Settings, s3_client: BaseClient | None = None) -> None:
         self._settings = settings
-        self._s3_client = s3_client or boto3.client(
-            "s3",
-            endpoint_url=settings.S3_ENDPOINT_URL,
-            aws_access_key_id=settings.S3_ACCESS_KEY,
-            aws_secret_access_key=settings.S3_SECRET_KEY,
-            region_name=settings.S3_REGION_NAME,
-            config=Config(
-                signature_version="s3v4",
-                s3={"addressing_style": "path"},
-            ),
+        self._s3_client = (
+            s3_client
+            if s3_client is not None
+            else boto3.client(
+                "s3",
+                endpoint_url=settings.S3_ENDPOINT_URL,
+                aws_access_key_id=settings.S3_ACCESS_KEY,
+                aws_secret_access_key=settings.S3_SECRET_KEY,
+                region_name=settings.S3_REGION_NAME,
+                config=Config(
+                    signature_version="s3v4",
+                    s3={"addressing_style": "path"},
+                ),
+            )
         )
+
+    def new_object_key(self, event_id: EventID, extension: str) -> str:
+        return f"events/{event_id}/banners/{uuid_compat.uuid7()}.{extension.lstrip('.')}"
+
+    def public_url(self, object_key: str) -> str:
+        return f"{self._settings.S3_PUBLIC_BASE_URL.rstrip('/')}/{quote(object_key)}"
 
     async def upload(
         self,
@@ -32,8 +69,15 @@ class EventImageService:
         *,
         content_type: str | None = None,
     ) -> str:
-        """Upload an image and return its object key."""
+        self.public_url(object_key)
         return await run_in_threadpool(self._upload, image, object_key, content_type)
+
+    async def delete(self, object_key: str) -> None:
+        await run_in_threadpool(
+            self._s3_client.delete_object,
+            Bucket=self._settings.S3_BUCKET_EVENT_IMAGES,
+            Key=object_key,
+        )
 
     def _upload(self, image: BinaryIO, object_key: str, content_type: str | None) -> str:
         bucket_name = self._settings.S3_BUCKET_EVENT_IMAGES

@@ -17,6 +17,10 @@ class FakeS3Client:
         self.created_buckets: list[dict[str, object]] = []
         self.bucket_policies: list[dict[str, str]] = []
         self.uploads: list[dict[str, object]] = []
+        self.deleted: list[dict[str, str]] = []
+
+    def delete_object(self, **kwargs: str) -> None:
+        self.deleted.append(kwargs)
 
     def list_buckets(self) -> dict[str, list[dict[str, str]]]:
         self.list_buckets_calls += 1
@@ -52,6 +56,7 @@ def make_settings(app_env: str, region: str = "us-east-1") -> Settings:
     return Settings.model_construct(
         APP_ENV=app_env,
         S3_ENDPOINT_URL="http://rustfs-server:9000",
+        S3_PUBLIC_BASE_URL="http://localhost:9000/event-images",
         S3_REGION_NAME=region,
         S3_ACCESS_KEY="test-access-key",
         S3_SECRET_KEY="test-secret-key",  # noqa: S106
@@ -61,9 +66,7 @@ def make_settings(app_env: str, region: str = "us-east-1") -> Settings:
 
 async def test_upload_creates_missing_development_bucket_and_uploads_image() -> None:
     s3_client = FakeS3Client()
-    service = EventImageService(
-        make_settings("development"), cast(BaseClient, s3_client)
-    )
+    service = EventImageService(make_settings("development"), cast(BaseClient, s3_client))
 
     object_key = await service.upload(
         io.BytesIO(b"image-bytes"),
@@ -105,9 +108,7 @@ async def test_upload_creates_bucket_in_configured_staging_region() -> None:
 
 async def test_upload_does_not_recreate_existing_bucket() -> None:
     s3_client = FakeS3Client(existing_buckets=("event-images",))
-    service = EventImageService(
-        make_settings("development"), cast(BaseClient, s3_client)
-    )
+    service = EventImageService(make_settings("development"), cast(BaseClient, s3_client))
 
     await service.upload(io.BytesIO(b"image-bytes"), "events/event-1/cover.png")
 

@@ -58,5 +58,6 @@ Read `var/docs/bounded_contexts.md` before designing anything: it is the domain 
 - Prefer to create value objects instead of using plain functions to validate input data.
 - Prefer to create a single application service per file in `packages/**/src/**/application`.
 - Prefer to use a repository instead of writing database instructions inside application services.
-- Prefer to put domain errors in `packages/**/src/**/domain/models/**/errors.py`
+- Prefer to put domain errors in `packages/**/src/**/domain/models/**/errors.py`.
+- Prefer abstract classes over protocols because it is easier to find usages.
 - Write code and docs in English.

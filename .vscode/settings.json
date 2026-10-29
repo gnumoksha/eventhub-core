@@ -1,4 +1,10 @@
 {
+    // ty==0.0.94 does not find abstract classes implementations in tests/
+    // so use ty only for error checking and pyrefly for language server.
+    "ty.disableLanguageServices": true,
+    "ty.importStrategy": "fromEnvironment",
+    "python.pyrefly.typeCheckingMode": "basic",
+
     "cSpell.words": [
         "checkin",
         "eventhub"
