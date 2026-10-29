@@ -10,8 +10,8 @@ Run uv, ruff, ty, alembic and pytest **inside the Docker container**, never on t
 docker compose up -d                                              # app-web, outbox-relay, events-consumers, postgresql, redis, rabbitmq
 docker compose exec -e APP_ENV=test app-web uv run pytest packages/events/tests   # tests of one package
 docker compose exec -e APP_ENV=test app-web uv run pytest packages/events/tests/domain/event_test.py::test_name   # a single test
-docker compose exec app-web uv run ruff check packages/ src/
 docker compose exec app-web uv run ruff format bin/ packages/ src/
+docker compose exec app-web uv run ruff check packages/ src/
 docker compose exec app-web uv run ty check --error-on-warning bin/ packages/ src/ --exclude packages/libs/tests
 docker compose exec app-web uv run alembic upgrade head
 docker compose exec app-web uv run alembic revision --autogenerate -m "message"
@@ -60,4 +60,5 @@ Read `var/docs/bounded_contexts.md` before designing anything: it is the domain 
 - Prefer to use a repository instead of writing database instructions inside application services.
 - Prefer to put domain errors in `packages/**/src/**/domain/models/**/errors.py`.
 - Prefer abstract classes over protocols because it is easier to find usages.
+- If you change a file, run ruff format, ruff check and ty check. If ruff raises PLR0913, try to replace the arguments with an object; if that is not possible, add a comment `# noqa: PLR0913 # object not possible`
 - Write code and docs in English.

@@ -2,8 +2,21 @@ from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from events.domain.models.event.event import Event
-from events.domain.models.event.events import EventCancelled, EventFinished, EventPostponed, EventPublished
-from events.domain.models.event.values import Address, AgeRating, EventPeriod, EventStatus, OnlineVenue
+from events.domain.models.event.events import (
+    EventCancelled,
+    EventFinished,
+    EventPostponed,
+    EventPublished,
+    EventUpdated,
+)
+from events.domain.models.event.values import (
+    Address,
+    AgeRating,
+    EventPeriod,
+    EventStatus,
+    EventUpdate,
+    OnlineVenue,
+)
 from shared.domain.errors import InvalidStateTransition, InvalidValue
 
 from tests.conftest import NOW, make_draft, make_period, make_published, make_venue
@@ -85,18 +98,52 @@ class TestEditing:
         event = make_published()
         later = NOW + timedelta(hours=1)
 
-        event.update_details(title="New title", description="New", age_rating=AgeRating.AGE_18, now=later)
+        event.update(
+            EventUpdate(
+                title="New title",
+                description="New",
+                age_rating=AgeRating.AGE_18,
+                venue=event.venue,
+                period=event.period,
+            ),
+            now=later,
+        )
 
         assert event.title == "New title"
         assert event.age_rating == AgeRating.AGE_18
         assert event.updated_at == later
+
+        [updated] = event.pull_events()
+        assert isinstance(updated, EventUpdated)
+        assert updated.event_id == event.id
+        assert updated.organization_id == event.organization_id
+        assert updated.to_dict() == {
+            "event_id": str(event.id),
+            "organization_id": str(event.organization_id),
+            "title": "New title",
+        }
+
+        deserialized = EventUpdated.from_dict(updated.to_dict(), updated.metadata)
+        assert deserialized.event_id == updated.event_id
+        assert deserialized.organization_id == updated.organization_id
+        assert deserialized.title == updated.title
+        assert deserialized.to_dict() == updated.to_dict()
 
     def test_cancelled_event_cannot_be_edited(self):
         event = make_draft()
         event.cancel("Not happening", NOW)
 
         with pytest.raises(InvalidStateTransition):
-            event.update_details(title="x", description="", age_rating=AgeRating.ALL_AGES, now=NOW)
+            event.update(
+                EventUpdate(
+                    title="x",
+                    description="",
+                    age_rating=AgeRating.ALL_AGES,
+                    venue=event.venue,
+                    period=event.period,
+                ),
+                now=NOW,
+            )
 
 
 class TestPublish:
@@ -109,8 +156,12 @@ class TestPublish:
         [published] = event.pull_events()
         assert isinstance(published, EventPublished)
         assert published.event_id == event.id
-        assert event.period is not None
-        assert published.start_at == event.period.start_at
+        assert published.organization_id == event.organization_id
+        assert published.to_dict() == {
+            "event_id": str(event.id),
+            "organization_id": str(event.organization_id),
+            "title": event.title,
+        }
 
     def test_requires_venue(self):
         with pytest.raises(InvalidStateTransition, match="venue"):

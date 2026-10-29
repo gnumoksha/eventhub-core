@@ -60,7 +60,7 @@ Each context section lists its aggregates, the invariants it owns, and the integ
   - Publishing requires a future period, a defined venue and an organization allowed to publish.
   - Once tickets have been sold, the period can only change through the **postponement** flow (which lets buyers request refunds). The venue cannot change silently.
   - A cancelled or finished event cannot be edited.
-- **Publishes:** `EventPublished`, `EventPostponed`, `EventCancelled`, `EventFinished`.
+- **Publishes:** `EventPublished`, `EventUpdated`, `EventPostponed`, `EventCancelled`, `EventFinished`.
 - **Consumes:** `OrganizationVerified` (to keep a local copy of whether the organization may publish paid events).
 - **Note:** ticket types, batches and prices **do not** live here. The event describes *what* happens; Sales decides *how it is sold*.
 

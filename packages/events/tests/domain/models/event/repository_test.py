@@ -5,7 +5,7 @@ import pytest
 import pytest_asyncio
 from events.domain.models.event.event import Event
 from events.domain.models.event.repository import EventRepository
-from events.domain.models.event.values import EventStatus, OnlineVenue
+from events.domain.models.event.values import EventStatus, EventUpdate, OnlineVenue
 from shared.domain.errors import ConcurrencyConflict
 from shared.infra.database import engine
 from shared.infra.outbox import OutboxMessage
@@ -140,6 +140,26 @@ async def test_stores_integration_events_in_the_outbox(repository: EventReposito
     await repository.save(event)
 
     assert await outbox_event_names(session, event.id) == ["eventhub.events.event.published"]
+    assert event.pull_events() == []
+
+
+async def test_stores_event_updated_in_the_outbox(repository: EventRepository, session: AsyncSession):
+    event = make_draft()
+    await repository.save(event)
+
+    event.update(
+        EventUpdate(
+            title="Updated title",
+            description=event.description,
+            age_rating=event.age_rating,
+            venue=event.venue,
+            period=event.period,
+        ),
+        now=NOW,
+    )
+    await repository.save(event)
+
+    assert await outbox_event_names(session, event.id) == ["eventhub.events.event.updated"]
     assert event.pull_events() == []
 
 

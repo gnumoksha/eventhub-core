@@ -103,10 +103,12 @@ def test_list_organization_events(client: TestClient):
 
 def test_change_venue_to_online(client: TestClient):
     event_id = create_event(client)["id"]
+    payload = event_payload()
+    payload["venue"] = {"type": "online", "url": "https://meet.example.com/x"}
 
     response = client.put(
-        f"/events/{event_id}/venue",
-        json={"type": "online", "url": "https://meet.example.com/x"},
+        f"/events/{event_id}",
+        json=payload,
     )
 
     assert response.status_code == 200

@@ -14,6 +14,7 @@ from events.domain.models.event.values import (
     AgeRating,
     EventPeriod,
     EventStatus,
+    EventUpdate,
     OnlineVenue,
     PhysicalVenue,
     Venue,
@@ -67,10 +68,21 @@ class CreateEventInput(BaseModel):
     period: PeriodSchema | None = None
 
 
-class UpdateEventDetailsInput(BaseModel):
+class UpdateEventInput(BaseModel):
     title: str = Field(max_length=100)
     description: str = Field(max_length=10_000)
     age_rating: AgeRating
+    venue: VenueSchema | None
+    period: PeriodSchema | None
+
+    def to_update(self) -> EventUpdate:
+        return EventUpdate(
+            title=self.title,
+            description=self.description,
+            age_rating=self.age_rating,
+            venue=self.venue.to_domain() if self.venue else None,
+            period=self.period.to_domain() if self.period else None,
+        )
 
 
 class CancelEventInput(BaseModel):

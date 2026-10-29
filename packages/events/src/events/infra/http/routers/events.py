@@ -17,8 +17,7 @@ from events.application.event.values import (
     CreateEventInput,
     EventOutput,
     PeriodSchema,
-    UpdateEventDetailsInput,
-    VenueSchema,
+    UpdateEventInput,
 )
 from events.domain.models.event.event import Event
 from events.domain.models.event.values import EventID, EventStatus
@@ -117,48 +116,17 @@ async def get_event(
     return _output(await service.get(event_id), image_service)
 
 
-@router.put("/events/{event_id}/details")
-async def update_event_details(
+@router.put("/events/{event_id}")
+async def update_event(
     event_id: EventID,
-    input_: UpdateEventDetailsInput,
+    input_: UpdateEventInput,
     service: EventServiceDep,
     image_service: EventImageServiceDep,
     _account_id: CurrentAccountID,
     _csrf: CSRFDep,
 ) -> EventOutput:
-    event = await service.update_details(
-        event_id,
-        title=input_.title,
-        description=input_.description,
-        age_rating=input_.age_rating,
-    )
+    event = await service.update(event_id, input_.to_update())
     return _output(event, image_service)
-
-
-@router.put("/events/{event_id}/venue")
-async def change_event_venue(
-    event_id: EventID,
-    input_: VenueSchema,
-    service: EventServiceDep,
-    image_service: EventImageServiceDep,
-    _account_id: CurrentAccountID,
-    _csrf: CSRFDep,
-) -> EventOutput:
-    return _output(
-        await service.change_venue(event_id, input_.to_domain()), image_service
-    )
-
-
-@router.put("/events/{event_id}/period")
-async def schedule_event(
-    event_id: EventID,
-    input_: PeriodSchema,
-    service: EventServiceDep,
-    image_service: EventImageServiceDep,
-    _account_id: CurrentAccountID,
-    _csrf: CSRFDep,
-) -> EventOutput:
-    return _output(await service.schedule(event_id, input_.to_domain()), image_service)
 
 
 @router.post("/events/{event_id}/publish")

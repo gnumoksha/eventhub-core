@@ -7,7 +7,15 @@ from shared.infra.logger import logger
 from events.application.event.image import EventBannerUpload, EventImageServiceDep, EventImageStorage
 from events.domain.models.event.event import Event
 from events.domain.models.event.repository import EventRepository, EventRepositoryDep
-from events.domain.models.event.values import AgeRating, EventID, EventPeriod, EventStatus, OrganizationID, Venue
+from events.domain.models.event.values import (
+    AgeRating,
+    EventID,
+    EventPeriod,
+    EventStatus,
+    EventUpdate,
+    OrganizationID,
+    Venue,
+)
 
 
 class EventNotFound(Exception):
@@ -103,23 +111,18 @@ class EventService:
         limit: int = 50,
         offset: int = 0,
     ) -> list[Event]:
-        return await self._repository.list_by_organization(organization_id, status=status, limit=limit, offset=offset)
+        return await self._repository.list_by_organization(
+            organization_id,
+            status=status,
+            limit=limit,
+            offset=offset,
+        )
 
-    async def update_details(self, event_id: EventID, *, title: str, description: str, age_rating: AgeRating) -> Event:
+    async def update(self, event_id: EventID, event_update: EventUpdate) -> Event:
         event = await self.get(event_id)
-        event.update_details(title=title, description=description, age_rating=age_rating, now=self._clock())
-        await self._repository.save(event)
-        return event
 
-    async def change_venue(self, event_id: EventID, venue: Venue) -> Event:
-        event = await self.get(event_id)
-        event.change_venue(venue, self._clock())
-        await self._repository.save(event)
-        return event
+        event.update(event_update, now=self._clock())
 
-    async def schedule(self, event_id: EventID, period: EventPeriod) -> Event:
-        event = await self.get(event_id)
-        event.schedule(period, self._clock())
         await self._repository.save(event)
         return event
 

@@ -1,4 +1,4 @@
-# The events dispatched by this domain model.
+# The domain events dispatched by the Event domain model.
 
 from datetime import datetime
 from typing import Self, override
@@ -9,14 +9,11 @@ from events.domain.models.event.values import EventID, OrganizationID
 
 
 class EventPublished(PublishableEvent, name="eventhub.events.event.published"):
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
-        *,
         event_id: EventID,
         organization_id: OrganizationID,
         title: str,
-        start_at: datetime,
-        end_at: datetime,
         metadata: Metadata | None = None,
     ) -> None:
         super().__init__(metadata)
@@ -24,8 +21,6 @@ class EventPublished(PublishableEvent, name="eventhub.events.event.published"):
         self.event_id = event_id
         self.organization_id = organization_id
         self.title = title
-        self.start_at = start_at
-        self.end_at = end_at
 
     @override
     def to_dict(self) -> SerializableDict:
@@ -33,20 +28,49 @@ class EventPublished(PublishableEvent, name="eventhub.events.event.published"):
             "event_id": str(self.event_id),
             "organization_id": str(self.organization_id),
             "title": self.title,
-            "start_at": self.start_at.isoformat(),
-            "end_at": self.end_at.isoformat(),
         }
 
     @override
     @classmethod
     def from_dict(cls, payload: SerializableDict, metadata: Metadata) -> Self:
         return cls(
-            event_id=EventID(str(payload["event_id"])),
-            organization_id=OrganizationID(str(payload["organization_id"])),
-            title=str(payload["title"]),
-            start_at=datetime.fromisoformat(str(payload["start_at"])),
-            end_at=datetime.fromisoformat(str(payload["end_at"])),
-            metadata=metadata,
+            EventID(str(payload["event_id"])),
+            OrganizationID(str(payload["organization_id"])),
+            str(payload["title"]),
+            metadata,
+        )
+
+
+class EventUpdated(PublishableEvent, name="eventhub.events.event.updated"):
+    def __init__(
+        self,
+        event_id: EventID,
+        organization_id: OrganizationID,
+        title: str,
+        metadata: Metadata | None = None,
+    ) -> None:
+        super().__init__(metadata)
+
+        self.event_id = event_id
+        self.organization_id = organization_id
+        self.title = title
+
+    @override
+    def to_dict(self) -> SerializableDict:
+        return {
+            "event_id": str(self.event_id),
+            "organization_id": str(self.organization_id),
+            "title": self.title,
+        }
+
+    @override
+    @classmethod
+    def from_dict(cls, payload: SerializableDict, metadata: Metadata) -> Self:
+        return cls(
+            EventID(str(payload["event_id"])),
+            OrganizationID(str(payload["organization_id"])),
+            str(payload["title"]),
+            metadata,
         )
 
 
