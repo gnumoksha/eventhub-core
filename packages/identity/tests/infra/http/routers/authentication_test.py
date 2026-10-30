@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from identity.application.authentication import get_identity_service
 from identity.domain.models.account.account import Account, Session
 from identity.domain.models.account.errors import (
     AuthenticationError,
@@ -14,7 +15,6 @@ from identity.domain.models.account.errors import (
 )
 from identity.domain.models.values import Password
 from identity.infra.http.authentication import (
-    get_identity_service,
     require_trusted_origin,
     session_cookie_name,
 )
