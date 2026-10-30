@@ -3,11 +3,14 @@ import hmac
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 from fastapi.concurrency import run_in_threadpool
 from pwdlib import PasswordHash
 from redis.asyncio import Redis
 from shared.infra.authentication.token_encryption import encrypt_authentication_token
+from shared.infra.di import Depends
+from shared.infra.redis import RedisDep
 
 from identity.domain.models.account.account import (
     Account,
@@ -28,6 +31,7 @@ from identity.domain.models.account.events import (
 from identity.domain.models.account.repository import (
     AccountEmailAlreadyExists,
     AccountRepository,
+    AccountRepositoryDep,
 )
 from identity.domain.models.values import Email, Password
 
@@ -262,6 +266,13 @@ class IdentityService:
             ),
             token,
         )
+
+
+def get_identity_service(repository: AccountRepositoryDep, redis: RedisDep) -> IdentityService:
+    return IdentityService(repository, redis)
+
+
+IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
 
 
 def csrf_token(session_token: str, secret: str) -> str:

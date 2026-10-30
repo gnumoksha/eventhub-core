@@ -3,14 +3,13 @@ import uuid
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Header, HTTPException, Request, status
+from fastapi import Header, HTTPException, Request, Security, status
+from fastapi.security import APIKeyCookie
 from shared.infra.di import Depends
-from shared.infra.redis import RedisDep
 from shared.settings import settings
 
-from identity.application.authentication import IdentityService, verify_csrf_token
+from identity.application.authentication import IdentityServiceDep, verify_csrf_token
 from identity.domain.models.account.account import Account, Session
-from identity.domain.models.account.repository import AccountRepositoryDep
 
 SESSION_COOKIE = "__Host-eventhub_session"
 DEV_SESSION_COOKIE = "eventhub_session"
@@ -27,15 +26,18 @@ class AuthenticatedSession:
     raw_token: str
 
 
-def get_identity_service(repository: AccountRepositoryDep, redis: RedisDep) -> IdentityService:
-    return IdentityService(repository, redis)
+session_cookie_scheme = APIKeyCookie(
+    name=session_cookie_name(),
+    scheme_name="SessionCookie",
+    description="Opaque session cookie issued by the identity login endpoint.",
+    auto_error=False,
+)
 
 
-IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
-
-
-async def require_session(request: Request, service: IdentityServiceDep) -> AuthenticatedSession:
-    token = request.cookies.get(session_cookie_name())
+async def require_session(
+    token: Annotated[str | None, Security(session_cookie_scheme)],
+    service: IdentityServiceDep,
+) -> AuthenticatedSession:
     if token is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     authenticated = await service.authenticate_session(token)
