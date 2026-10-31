@@ -6,6 +6,10 @@ class DomainError(Exception):
         self.message = message
 
 
+class EntityNotFound(DomainError):
+    """An entity was not found."""
+
+
 class InvalidValue(DomainError):
     """A value does not satisfy the domain rules (e.g. an empty title)."""
 
@@ -16,3 +20,7 @@ class InvalidStateTransition(DomainError):
 
 class ConcurrencyConflict(DomainError):
     """The aggregate was modified by someone else since it was loaded."""
+
+
+class AccessDenied(DomainError):
+    """Access to the entity is denied."""

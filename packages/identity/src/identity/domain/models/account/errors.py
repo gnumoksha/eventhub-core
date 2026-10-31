@@ -1,4 +1,11 @@
+from shared.domain.errors import DomainError
+
+
 class AuthenticationError(Exception):
+    pass
+
+
+class AccountNotFound(DomainError):
     pass
 
 

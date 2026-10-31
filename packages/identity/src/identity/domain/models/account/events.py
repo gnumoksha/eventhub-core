@@ -34,6 +34,21 @@ class AccountLoggedIn(PublishableEvent, name="eventhub.identity.account.logged_i
         )
 
 
+class AccountWasDeactivated(PublishableEvent, name="eventhub.identity.account.deactivated"):
+    def __init__(self, account_id: AccountID, metadata: Metadata | None = None) -> None:
+        super().__init__(metadata)
+        self.account_id = account_id
+
+    @override
+    def to_dict(self) -> SerializableDict:
+        return {"account_id": str(self.account_id)}
+
+    @override
+    @classmethod
+    def from_dict(cls, payload: SerializableDict, metadata: Metadata) -> Self:
+        return cls(AccountID(str(payload["account_id"])), metadata)
+
+
 class AccountVerificationRequested(PublishableEvent, name="eventhub.identity.account.verification_requested"):
     def __init__(self, email: str, encrypted_token: str, metadata: Metadata | None = None) -> None:
         super().__init__(metadata)

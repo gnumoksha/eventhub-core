@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.0.0"
     APP_DEBUG: bool = False
     APP_SECRET: SecretStr
+    PERSONAL_DATA_ENCRYPTION_KEY: SecretStr
     LOGGING_LEVEL: str = "INFO"
     PUBLIC_API_URL: str
     PUBLIC_FRONTEND_URL: str
