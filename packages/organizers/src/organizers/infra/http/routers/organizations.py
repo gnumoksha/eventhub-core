@@ -14,6 +14,7 @@ from organizers.application.organization.values import (
     PayoutAccountInput,
     UpdateOrganizationInput,
 )
+from organizers.application.payout_account.service import PayoutAccountServiceDep
 from organizers.domain.models.organization.organization import Organization
 from organizers.domain.models.organization.values import mask_tax_identifier
 from organizers.domain.models.payout_account.payout_account import PayoutAccount
@@ -216,11 +217,11 @@ async def submit_verification(
 async def submit_payout_account(
     organization_id: UUID,
     input_: Annotated[PayoutAccountInput, Body(discriminator="method")],
-    service: OrganizationServiceDep,
+    service: PayoutAccountServiceDep,
     account_id: CurrentAccountID,
     _csrf: CSRFDep,
 ) -> PayoutAccountOutput:
-    payout_account = await service.submit_payout_account(
+    payout_account = await service.submit(
         organization_id,
         account_id,
         details=input_.to_domain(),
@@ -231,10 +232,10 @@ async def submit_payout_account(
 @router.get("/{organization_id}/payout-account")
 async def get_payout_account(
     organization_id: UUID,
-    service: OrganizationServiceDep,
+    service: PayoutAccountServiceDep,
     account_id: CurrentAccountID,
 ) -> dict[str, PayoutAccountOutput | None]:
-    current, pending = await service.get_payout_accounts(organization_id, account_id)
+    current, pending = await service.get_for_organization(organization_id, account_id)
     return {
         "current": _payout_output(current) if current else None,
         "pending": _payout_output(pending) if pending else None,

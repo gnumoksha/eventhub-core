@@ -5,15 +5,22 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from identity.infra.http.authentication import require_account_id, require_csrf
 from organizers.application.organization.service import OrganizationService, __get_service
+from organizers.application.payout_account.service import (
+    PayoutAccountService,
+)
+from organizers.application.payout_account.service import (
+    __get_service as __get_payout_account_service,
+)
 from organizers.infra.http.routers.setup import setup_routers
 
 
 @pytest.fixture
-def client(service: OrganizationService):
+def client(service: OrganizationService, payout_account_service: PayoutAccountService):
     app = FastAPI()
     setup_routers(app)
     active_account = {"id": uuid.uuid4()}
     app.dependency_overrides[__get_service] = lambda: service
+    app.dependency_overrides[__get_payout_account_service] = lambda: payout_account_service
     app.dependency_overrides[require_account_id] = lambda: active_account["id"]
     app.dependency_overrides[require_csrf] = lambda: None
     return TestClient(app), active_account

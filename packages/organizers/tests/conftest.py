@@ -6,6 +6,7 @@ import pytest
 from libs.events import PublishableEvent
 from libs.time_utils import FakeClock
 from organizers.application.organization.service import OrganizationService
+from organizers.application.payout_account.service import PayoutAccountService
 from organizers.domain.models.organization.organization import Organization
 from organizers.domain.models.organization.repository import OrganizationRepository
 from organizers.domain.models.organization.values import (
@@ -84,6 +85,11 @@ def clock(now: datetime) -> FakeClock:
 @pytest.fixture
 def service(repository: InMemoryOrganizationRepository, clock: FakeClock) -> OrganizationService:
     return OrganizationService(repository, clock)
+
+
+@pytest.fixture
+def payout_account_service(repository: InMemoryOrganizationRepository, clock: FakeClock) -> PayoutAccountService:
+    return PayoutAccountService(repository, clock)
 
 
 @pytest.fixture
