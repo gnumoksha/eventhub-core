@@ -103,6 +103,7 @@ def test_payout_account_response_masks_sensitive_values(client):
         json={
             "method": "PIX",
             "pix_key": "maria@example.com",
+            "pix_key_type": "EMAIL",
             "holder_name": "Maria da Silva",
             "holder_tax_id": "52998224725",
         },

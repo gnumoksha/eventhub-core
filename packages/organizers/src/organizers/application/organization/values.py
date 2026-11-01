@@ -3,15 +3,14 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 from shared.domain.errors import InvalidValue
+from shared.domain.values.financial import Pix, PixKeyType
 
 from organizers.domain.models.organization.values import (
-    BankPayoutDetails,
     MemberRole,
     OrganizationType,
-    PayoutMethod,
-    PixPayoutDetails,
     TaxIdentifier,
 )
+from organizers.domain.models.payout_account.values import BankPayoutDetails, PayoutMethod, PixPayoutDetails
 
 
 class CreateOrganizationInput(BaseModel):
@@ -55,11 +54,16 @@ class AddMemberInput(BaseModel):
 class PixPayoutInput(BaseModel):
     method: Literal[PayoutMethod.PIX] = PayoutMethod.PIX
     pix_key: str = Field(min_length=1, max_length=200)
+    pix_key_type: PixKeyType
     holder_name: str = Field(min_length=1, max_length=200)
     holder_tax_id: str = Field(min_length=11, max_length=18)
 
     def to_domain(self) -> PixPayoutDetails:
-        return PixPayoutDetails(self.pix_key, self.holder_name, self.holder_tax_id)
+        try:
+            pix = Pix(self.pix_key, self.pix_key_type)
+        except ValueError as exc:
+            raise InvalidValue(str(exc)) from exc
+        return PixPayoutDetails(pix, self.holder_name, self.holder_tax_id)
 
 
 class BankPayoutInput(BaseModel):

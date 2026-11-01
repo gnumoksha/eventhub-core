@@ -10,14 +10,14 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import StaleDataError
 from sqlmodel import col, select
 
-from organizers.domain.models.organization.organization import Member, Organization, PayoutAccount
+from organizers.domain.models.organization.organization import Member, Organization
 from organizers.domain.models.organization.values import (
     AccountID,
     OrganizationID,
-    PayoutAccountID,
-    PayoutAccountStatus,
     VerificationStatus,
 )
+from organizers.domain.models.payout_account.payout_account import PayoutAccount
+from organizers.domain.models.payout_account.values import PayoutAccountID, PayoutAccountStatus
 
 
 class OrganizationRepository:

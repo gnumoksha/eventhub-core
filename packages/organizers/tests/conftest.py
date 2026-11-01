@@ -6,15 +6,15 @@ import pytest
 from libs.events import PublishableEvent
 from libs.time_utils import FakeClock
 from organizers.application.organization.service import OrganizationService
-from organizers.domain.models.organization.organization import Organization, PayoutAccount
+from organizers.domain.models.organization.organization import Organization
 from organizers.domain.models.organization.repository import OrganizationRepository
 from organizers.domain.models.organization.values import (
     OrganizationID,
     OrganizationType,
-    PayoutAccountID,
-    PayoutAccountStatus,
     VerificationStatus,
 )
+from organizers.domain.models.payout_account.payout_account import PayoutAccount
+from organizers.domain.models.payout_account.values import PayoutAccountID, PayoutAccountStatus
 
 NOW = datetime(2030, 1, 10, 12, 0, tzinfo=UTC)
 
