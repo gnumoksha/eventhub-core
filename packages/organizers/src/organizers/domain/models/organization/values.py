@@ -2,13 +2,53 @@ import re
 import uuid
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import ClassVar
 
 from shared.domain.errors import InvalidValue
 
 OrganizationID = uuid.UUID
 AccountID = uuid.UUID
+NAME_MAX_LENGTH = 200
+REJECTION_REASON_MAX_LENGTH = 500
 _CPF_LENGTH = 11
 _CPF_CHECK_DIGIT_ROLLOVER = 10
+
+
+@dataclass(frozen=True)
+class Name:
+    value: str
+    label: ClassVar[str] = "Name"
+
+    def __post_init__(self) -> None:
+        value = self.value.strip()
+        if not value or len(value) > NAME_MAX_LENGTH:
+            raise InvalidValue(f"{self.label} must contain between 1 and {NAME_MAX_LENGTH} characters")
+        object.__setattr__(self, "value", value)
+
+
+class PublicName(Name):
+    label = "Public name"
+
+
+class LegalName(Name):
+    label = "Legal name"
+
+
+@dataclass(frozen=True)
+class RejectionReason:
+    value: str
+
+    def __post_init__(self) -> None:
+        value = self.value.strip()
+        if not value or len(value) > REJECTION_REASON_MAX_LENGTH:
+            raise InvalidValue(
+                f"The rejection reason must contain between 1 and {REJECTION_REASON_MAX_LENGTH} characters"
+            )
+        object.__setattr__(self, "value", value)
+
+
+class OrganizationVerificationRejectionReason(RejectionReason):
+    pass
 
 
 class OrganizationType(StrEnum):

@@ -12,12 +12,8 @@ from sqlalchemy import Enum
 from sqlalchemy.orm import declared_attr, reconstructor
 from sqlmodel import Field, SQLModel
 
-from organizers.domain.models.organization.validation import (
-    REJECTION_REASON_MAX_LENGTH,
-    _validate_name,
-    _validate_rejection_reason,
-)
 from organizers.domain.models.organization.values import (
+    REJECTION_REASON_MAX_LENGTH,
     OrganizationID,
     OrganizationType,
     TaxIdentifier,
@@ -25,7 +21,9 @@ from organizers.domain.models.organization.values import (
 from organizers.domain.models.payout_account.events import PayoutAccountVerified
 from organizers.domain.models.payout_account.values import (
     BankPayoutDetails,
+    PayoutAccountHolderName,
     PayoutAccountID,
+    PayoutAccountRejectionReason,
     PayoutAccountStatus,
     PayoutMethod,
     PixPayoutDetails,
@@ -84,7 +82,7 @@ class PayoutAccount(SQLModel, table=True):
             status=PayoutAccountStatus.PENDING,
             pix_key=details.pix.key,
             pix_type=details.pix.type,
-            holder_name=_validate_name(details.holder_name, "Account holder name"),
+            holder_name=PayoutAccountHolderName(details.holder_name).value,
             holder_tax_id=holder_tax_id,
             created_at=now,
             updated_at=now,
@@ -120,7 +118,7 @@ class PayoutAccount(SQLModel, table=True):
             account_number=values[2],
             account_digit=values[3],
             account_type=account_type,
-            holder_name=_validate_name(details.holder_name, "Account holder name"),
+            holder_name=PayoutAccountHolderName(details.holder_name).value,
             holder_tax_id=holder_tax_id,
             created_at=now,
             updated_at=now,
@@ -129,6 +127,7 @@ class PayoutAccount(SQLModel, table=True):
     def verify(self, *, now: datetime) -> None:
         if self.status != PayoutAccountStatus.PENDING:
             raise InvalidStateTransition("Only a pending payout account can be approved")
+
         self.status = PayoutAccountStatus.VERIFIED
         self.rejection_reason = None
         self.updated_at = now
@@ -137,13 +136,15 @@ class PayoutAccount(SQLModel, table=True):
     def reject(self, reason: str, *, now: datetime) -> None:
         if self.status != PayoutAccountStatus.PENDING:
             raise InvalidStateTransition("Only a pending payout account can be rejected")
+
         self.status = PayoutAccountStatus.REJECTED
-        self.rejection_reason = _validate_rejection_reason(reason)
+        self.rejection_reason = PayoutAccountRejectionReason(reason).value
         self.updated_at = now
 
     def supersede(self, *, now: datetime) -> None:
         if self.status != PayoutAccountStatus.VERIFIED:
             raise InvalidStateTransition("Only a verified payout account can be replaced")
+
         self.status = PayoutAccountStatus.SUPERSEDED
         self.updated_at = now
 

@@ -17,18 +17,17 @@ from organizers.domain.models.organization.events import (
     OrganizationCreated,
     OrganizationVerified,
 )
-from organizers.domain.models.organization.validation import (
+from organizers.domain.models.organization.values import (
     NAME_MAX_LENGTH,
     REJECTION_REASON_MAX_LENGTH,
-    _validate_name,
-    _validate_rejection_reason,
-)
-from organizers.domain.models.organization.values import (
     AccountID,
+    LegalName,
     MemberRole,
     OrganizationID,
     OrganizationProfile,
     OrganizationType,
+    OrganizationVerificationRejectionReason,
+    PublicName,
     TaxIdentifier,
     VerificationStatus,
 )
@@ -79,8 +78,8 @@ class Organization(SQLModel, table=True):
         owner_account_id: AccountID,
         now: datetime,
     ) -> Self:
-        public_name = _validate_name(profile.public_name, "Public name")
-        legal_name = _validate_name(profile.legal_name, "Legal name")
+        public_name = PublicName(profile.public_name).value
+        legal_name = LegalName(profile.legal_name).value
         tax_id = TaxIdentifier(profile.tax_id, profile.organization_type).value
         organization = cls(
             organization_type=profile.organization_type,
@@ -129,14 +128,14 @@ class Organization(SQLModel, table=True):
         self._record(MemberRemoved(self.id, account_id))
 
     def update_public_name(self, public_name: str, *, now: datetime) -> None:
-        self.public_name = _validate_name(public_name, "Public name")
+        self.public_name = PublicName(public_name).value
         self._touch(now)
 
     def update_legal_profile(self, legal_name: str, tax_id: str, *, now: datetime) -> None:
         if self.verification_status not in (VerificationStatus.NOT_SUBMITTED, VerificationStatus.REJECTED):
             raise InvalidStateTransition("Legal details can only be changed before submission or after rejection")
 
-        self.legal_name = _validate_name(legal_name, "Legal name")
+        self.legal_name = LegalName(legal_name).value
         self.tax_id = TaxIdentifier(tax_id, self.organization_type).value
         self._touch(now)
 
@@ -164,7 +163,7 @@ class Organization(SQLModel, table=True):
             raise InvalidStateTransition("Only pending verification can be rejected")
 
         self.verification_status = VerificationStatus.REJECTED
-        self.verification_rejection_reason = _validate_rejection_reason(reason)
+        self.verification_rejection_reason = OrganizationVerificationRejectionReason(reason).value
         self._touch(now)
 
     def pull_events(self) -> list[PublishableEvent]:

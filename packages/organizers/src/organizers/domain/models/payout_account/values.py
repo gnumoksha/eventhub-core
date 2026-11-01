@@ -4,6 +4,8 @@ from enum import StrEnum
 
 from shared.domain.values.financial import Pix
 
+from organizers.domain.models.organization.values import Name, RejectionReason
+
 PayoutAccountID = uuid.UUID
 
 
@@ -17,6 +19,14 @@ class PayoutAccountStatus(StrEnum):
     VERIFIED = "VERIFIED"
     REJECTED = "REJECTED"
     SUPERSEDED = "SUPERSEDED"
+
+
+class PayoutAccountHolderName(Name):
+    label = "Account holder name"
+
+
+class PayoutAccountRejectionReason(RejectionReason):
+    pass
 
 
 @dataclass(frozen=True)
