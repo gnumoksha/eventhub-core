@@ -6,14 +6,14 @@ from organizers.domain.models.payout_account.events import PayoutAccountVerified
 from organizers.domain.models.payout_account.values import BankPayoutDetails, PayoutAccountStatus, PixPayoutDetails
 from shared.domain.values.financial import Pix, PixKeyType
 
-from tests.conftest import InMemoryOrganizationRepository
+from tests.conftest import InMemoryPayoutAccountRepository
 
 
 @pytest.mark.asyncio
 async def test_replacement_keeps_current_account_until_new_account_is_approved(
     payout_account_service: PayoutAccountService,
     create_individual,
-    repository: InMemoryOrganizationRepository,
+    payout_repository: InMemoryPayoutAccountRepository,
     account_id: uuid.UUID,
 ):
     organization = await create_individual()
@@ -31,16 +31,16 @@ async def test_replacement_keeps_current_account_until_new_account_is_approved(
 
     assert organization.current_payout_account_id == first.id
     assert organization.pending_payout_account_id == second.id
-    assert repository.payout_accounts[first.id].status == PayoutAccountStatus.VERIFIED
+    assert payout_repository.payout_accounts[first.id].status == PayoutAccountStatus.VERIFIED
     assert not organization.can_sell_paid_tickets
 
     await payout_account_service.approve(organization.id, second.id)
 
     assert organization.current_payout_account_id == second.id
     assert organization.pending_payout_account_id is None
-    assert repository.payout_accounts[first.id].status == PayoutAccountStatus.SUPERSEDED
-    assert repository.payout_accounts[second.id].status == PayoutAccountStatus.VERIFIED
-    assert isinstance(repository.outbox[-1], PayoutAccountVerified)
+    assert payout_repository.payout_accounts[first.id].status == PayoutAccountStatus.SUPERSEDED
+    assert payout_repository.payout_accounts[second.id].status == PayoutAccountStatus.VERIFIED
+    assert isinstance(payout_repository.outbox[-1], PayoutAccountVerified)
 
 
 @pytest.mark.asyncio

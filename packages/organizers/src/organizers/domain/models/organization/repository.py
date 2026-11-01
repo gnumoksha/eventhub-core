@@ -1,6 +1,5 @@
 from typing import Annotated
 
-from libs.events import PublishableEvent
 from shared.domain.errors import ConcurrencyConflict
 from shared.infra.database import SessionDep
 from shared.infra.di import Depends
@@ -16,8 +15,6 @@ from organizers.domain.models.organization.values import (
     OrganizationID,
     VerificationStatus,
 )
-from organizers.domain.models.payout_account.payout_account import PayoutAccount
-from organizers.domain.models.payout_account.values import PayoutAccountID, PayoutAccountStatus
 
 
 class OrganizationRepository:
@@ -64,27 +61,11 @@ class OrganizationRepository:
         result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def get_payout_account(self, payout_account_id: PayoutAccountID) -> PayoutAccount | None:
-        return await self._session.get(PayoutAccount, payout_account_id)
-
-    async def list_pending_payout_accounts(self) -> list[PayoutAccount]:
-        query = (
-            select(PayoutAccount)
-            .where(col(PayoutAccount.status) == PayoutAccountStatus.PENDING)
-            .order_by(col(PayoutAccount.created_at), col(PayoutAccount.id))
-        )
-        result = await self._session.execute(query)
-        return list(result.scalars().all())
-
-    async def save(self, organization: Organization, *payout_accounts: PayoutAccount) -> None:
+    async def save(self, organization: Organization) -> None:
         organization_id = organization.id
         self._session.add(organization)
-        self._session.add_all(payout_accounts)
 
-        pending_events: list[PublishableEvent] = organization.pull_events()
-        for payout_account in payout_accounts:
-            pending_events.extend(payout_account.pull_events())
-        add_to_outbox(self._session, pending_events)
+        add_to_outbox(self._session, organization.pull_events())
 
         try:
             await self._session.commit()

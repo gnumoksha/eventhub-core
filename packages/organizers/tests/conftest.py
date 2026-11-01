@@ -15,6 +15,7 @@ from organizers.domain.models.organization.values import (
     VerificationStatus,
 )
 from organizers.domain.models.payout_account.payout_account import PayoutAccount
+from organizers.domain.models.payout_account.repository import PayoutAccountRepository
 from organizers.domain.models.payout_account.values import PayoutAccountID, PayoutAccountStatus
 
 NOW = datetime(2030, 1, 10, 12, 0, tzinfo=UTC)
@@ -23,7 +24,6 @@ NOW = datetime(2030, 1, 10, 12, 0, tzinfo=UTC)
 class InMemoryOrganizationRepository(OrganizationRepository):
     def __init__(self) -> None:
         self.organizations: dict[OrganizationID, Organization] = {}
-        self.payout_accounts: dict[PayoutAccountID, PayoutAccount] = {}
         self.outbox: list[PublishableEvent] = []
 
     @override
@@ -44,17 +44,31 @@ class InMemoryOrganizationRepository(OrganizationRepository):
         return [org for org in self.organizations.values() if org.verification_status == VerificationStatus.PENDING]
 
     @override
-    async def get_payout_account(self, payout_account_id: PayoutAccountID) -> PayoutAccount | None:
+    @override
+    async def save(self, organization: Organization) -> None:
+        organization.version += 1
+        self.organizations[organization.id] = organization
+        self.outbox.extend(organization.pull_events())
+
+
+class InMemoryPayoutAccountRepository(PayoutAccountRepository):
+    def __init__(self, organization_repository: InMemoryOrganizationRepository) -> None:
+        self._organization_repository = organization_repository
+        self.payout_accounts: dict[PayoutAccountID, PayoutAccount] = {}
+        self.outbox = organization_repository.outbox
+
+    @override
+    async def get(self, payout_account_id: PayoutAccountID) -> PayoutAccount | None:
         return self.payout_accounts.get(payout_account_id)
 
     @override
-    async def list_pending_payout_accounts(self) -> list[PayoutAccount]:
+    async def list_pending_review(self) -> list[PayoutAccount]:
         return [payout for payout in self.payout_accounts.values() if payout.status == PayoutAccountStatus.PENDING]
 
     @override
     async def save(self, organization: Organization, *payout_accounts: PayoutAccount) -> None:
         organization.version += 1
-        self.organizations[organization.id] = organization
+        self._organization_repository.organizations[organization.id] = organization
         self.outbox.extend(organization.pull_events())
         for payout_account in payout_accounts:
             payout_account.version += 1
@@ -78,6 +92,11 @@ def repository() -> InMemoryOrganizationRepository:
 
 
 @pytest.fixture
+def payout_repository(repository: InMemoryOrganizationRepository) -> InMemoryPayoutAccountRepository:
+    return InMemoryPayoutAccountRepository(repository)
+
+
+@pytest.fixture
 def clock(now: datetime) -> FakeClock:
     return FakeClock(now)
 
@@ -88,8 +107,12 @@ def service(repository: InMemoryOrganizationRepository, clock: FakeClock) -> Org
 
 
 @pytest.fixture
-def payout_account_service(repository: InMemoryOrganizationRepository, clock: FakeClock) -> PayoutAccountService:
-    return PayoutAccountService(repository, clock)
+def payout_account_service(
+    repository: InMemoryOrganizationRepository,
+    payout_repository: InMemoryPayoutAccountRepository,
+    clock: FakeClock,
+) -> PayoutAccountService:
+    return PayoutAccountService(repository, payout_repository, clock)
 
 
 @pytest.fixture

@@ -10,12 +10,19 @@ from organizers.domain.models.organization.repository import OrganizationReposit
 from organizers.domain.models.organization.values import AccountID, OrganizationID
 from organizers.domain.models.payout_account.errors import PayoutAccountNotFound
 from organizers.domain.models.payout_account.payout_account import PayoutAccount
+from organizers.domain.models.payout_account.repository import PayoutAccountRepository, PayoutAccountRepositoryDep
 from organizers.domain.models.payout_account.values import BankPayoutDetails, PayoutAccountID, PixPayoutDetails
 
 
 class PayoutAccountService:
-    def __init__(self, repository: OrganizationRepository, clock: Clock = utc_now) -> None:
-        self._repository = repository
+    def __init__(
+        self,
+        organization_repository: OrganizationRepository,
+        payout_account_repository: PayoutAccountRepository,
+        clock: Clock = utc_now,
+    ) -> None:
+        self._organizations = organization_repository
+        self._payout_accounts = payout_account_repository
         self._clock = clock
 
     async def submit(
@@ -43,7 +50,7 @@ class PayoutAccountService:
             )
         organization.pending_payout_account_id = payout_account.id
         organization.updated_at = self._clock()
-        await self._repository.save(organization, payout_account)
+        await self._payout_accounts.save(organization, payout_account)
         return payout_account
 
     async def approve(self, organization_id: OrganizationID, payout_account_id: PayoutAccountID) -> PayoutAccount:
@@ -63,7 +70,7 @@ class PayoutAccountService:
         organization.current_payout_account_id = payout_account.id
         organization.pending_payout_account_id = None
         organization.updated_at = now
-        await self._repository.save(organization, payout_account, *([old_account] if old_account else []))
+        await self._payout_accounts.save(organization, payout_account, *([old_account] if old_account else []))
         return payout_account
 
     async def reject(
@@ -77,12 +84,12 @@ class PayoutAccountService:
         payout_account.reject(reason, now=now)
         organization.pending_payout_account_id = None
         organization.updated_at = now
-        await self._repository.save(organization, payout_account)
+        await self._payout_accounts.save(organization, payout_account)
         return payout_account
 
     async def list_pending_review(self) -> list[PayoutAccount]:
         """Internal review queue; not exposed through the public HTTP API."""
-        return await self._repository.list_pending_payout_accounts()
+        return await self._payout_accounts.list_pending_review()
 
     async def get_for_organization(
         self, organization_id: OrganizationID, account_id: AccountID
@@ -101,7 +108,7 @@ class PayoutAccountService:
         return current, pending
 
     async def _get_owner_organization(self, organization_id: OrganizationID, account_id: AccountID) -> Organization:
-        organization = await self._repository.get_for_member(organization_id, account_id)
+        organization = await self._organizations.get_for_member(organization_id, account_id)
         if organization is None:
             raise OrganizationNotFound
 
@@ -111,17 +118,20 @@ class PayoutAccountService:
         return organization
 
     async def _get_organization(self, organization_id: OrganizationID) -> Organization:
-        organization = await self._repository.get(organization_id)
+        organization = await self._organizations.get(organization_id)
         if organization is None:
             raise OrganizationNotFound
+
         return organization
 
     async def _get_payout_account(self, payout_account_id: PayoutAccountID | None) -> PayoutAccount:
         if payout_account_id is None:
             raise PayoutAccountNotFound
-        payout_account = await self._repository.get_payout_account(payout_account_id)
+
+        payout_account = await self._payout_accounts.get(payout_account_id)
         if payout_account is None:
             raise PayoutAccountNotFound
+
         return payout_account
 
     @staticmethod
@@ -130,8 +140,11 @@ class PayoutAccountService:
             raise InvalidStateTransition("A payout account is already waiting for review")
 
 
-async def __get_service(repository: OrganizationRepositoryDep) -> PayoutAccountService:
-    return PayoutAccountService(repository)
+async def __get_service(
+    organization_repository: OrganizationRepositoryDep,
+    payout_account_repository: PayoutAccountRepositoryDep,
+) -> PayoutAccountService:
+    return PayoutAccountService(organization_repository, payout_account_repository)
 
 
 PayoutAccountServiceDep = Annotated[PayoutAccountService, Depends(__get_service)]
