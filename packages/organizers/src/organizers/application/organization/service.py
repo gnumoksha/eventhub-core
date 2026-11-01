@@ -7,7 +7,6 @@ from shared.infra.di import Depends
 from organizers.domain.models.organization.errors import (
     OrganizationAccessDenied,
     OrganizationNotFound,
-    PayoutAccountNotFound,
 )
 from organizers.domain.models.organization.organization import Organization
 from organizers.domain.models.organization.repository import OrganizationRepository, OrganizationRepositoryDep
@@ -19,6 +18,7 @@ from organizers.domain.models.organization.values import (
     OrganizationType,
     TaxIdentifier,
 )
+from organizers.domain.models.payout_account.errors import PayoutAccountNotFound
 from organizers.domain.models.payout_account.payout_account import PayoutAccount
 from organizers.domain.models.payout_account.values import BankPayoutDetails, PayoutAccountID, PixPayoutDetails
 

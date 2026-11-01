@@ -9,8 +9,3 @@ class OrganizationNotFound(EntityNotFound):
 class OrganizationAccessDenied(AccessDenied):
     def __init__(self) -> None:
         super().__init__("Only organization owners can manage it")
-
-
-class PayoutAccountNotFound(EntityNotFound):
-    def __init__(self) -> None:
-        super().__init__("Payout account not found")
