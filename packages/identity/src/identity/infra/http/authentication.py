@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import Header, HTTPException, Request, Security, status
 from fastapi.security import APIKeyCookie
 from shared.infra.di import Depends
+from shared.infra.i18n import t
 from shared.settings import settings
 
 from identity.application.authentication import IdentityServiceDep, verify_csrf_token
@@ -40,11 +41,11 @@ async def require_session(
     service: IdentityServiceDep,
 ) -> AuthenticatedSession:
     if token is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=t("Authentication required"))
 
     authenticated = await service.authenticate_session(token)
     if authenticated is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=t("Authentication required"))
 
     session, account = authenticated
     return AuthenticatedSession(session, account, token)
@@ -62,7 +63,10 @@ class CommonAuthenticatedSession:
 
 async def require_common_session(auth: FullyAuthenticatedSessionDep) -> CommonAuthenticatedSession:
     if auth.account.email_verified_at is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Verify your email to access this resource")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=t("Verify your email to access this resource"),
+        )
 
     return CommonAuthenticatedSession(
         account_id=auth.account.id,
@@ -87,7 +91,7 @@ def _trusted_origin(origin: str | None) -> bool:
 
 async def require_trusted_origin(origin: Annotated[str | None, Header()] = None) -> None:
     if not _trusted_origin(origin):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Untrusted request origin")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=t("Untrusted request origin"))
 
 
 TrustedOriginDep = Annotated[None, Depends(require_trusted_origin)]
@@ -99,9 +103,9 @@ async def require_csrf(
     csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
 ) -> None:
     if not _trusted_origin(request.headers.get("origin")):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Untrusted request origin")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=t("Untrusted request origin"))
     if not verify_csrf_token(auth.raw_token, settings.APP_SECRET.get_secret_value(), csrf_header):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid CSRF token")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=t("Invalid CSRF token"))
 
 
 CSRFDep = Annotated[None, Depends(require_csrf)]

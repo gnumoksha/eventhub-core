@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field, field_validator
 from shared.domain.errors import InvalidValue
+from shared.infra.i18n import t
 from shared.settings import settings
 
 from identity.application.authentication import (
@@ -36,7 +37,7 @@ class CredentialsInput(BaseModel):
         try:
             return Email(value).value
         except InvalidValue as exc:
-            raise ValueError("Enter a valid email address") from exc
+            raise ValueError(t("Enter a valid email address")) from exc
 
     @field_validator("password")
     @classmethod
@@ -44,7 +45,7 @@ class CredentialsInput(BaseModel):
         try:
             return Password(value).value
         except InvalidValue as exc:
-            raise ValueError("Enter a valid password") from exc
+            raise ValueError(t("Enter a valid password")) from exc
 
 
 class EmailInput(BaseModel):
@@ -56,7 +57,7 @@ class EmailInput(BaseModel):
         try:
             return Email(value).value
         except InvalidValue as exc:
-            raise ValueError("Enter a valid email address") from exc
+            raise ValueError(t("Enter a valid email address")) from exc
 
 
 class TokenInput(BaseModel):
@@ -146,7 +147,9 @@ async def signup(
     # A new account gets a cookie; the response body never reveals whether the
     # normalized address already existed. The client fetches /identity/csrf.
     return MessageOutput(
-        message="If the address can be registered, verification instructions will be sent"
+        message=t(
+            "If the address can be registered, verification instructions will be sent"
+        )
     )
 
 
@@ -159,17 +162,24 @@ async def login(
     _origin: TrustedOriginDep,
 ) -> SessionOutput:
     client_ip = request.client.host if request.client else "unknown"
+    if client_ip == "unknown" and settings.is_prod_like():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=t("Client IP address is required"),
+        )
+
     try:
         account, session, raw_token = await service.login(
             Email.from_trusted(input_.email),  # already validated on CredentialsInput
             Password.from_trusted(
-                input_.password
-            ),  # already validated on CredentialsInput
+                input_.password  # already validated on CredentialsInput
+            ),
             client_ip,
         )
     except AuthenticationError as exc:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=t("Invalid email or password"),
         ) from exc
 
     _set_session_cookie(response, raw_token, session.expires_at)
@@ -180,7 +190,9 @@ async def login(
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
-    auth: FullyAuthenticatedSessionDep, service: IdentityServiceDep, _csrf: CSRFDep
+    auth: FullyAuthenticatedSessionDep,
+    service: IdentityServiceDep,
+    _csrf: CSRFDep,
 ) -> Response:
     await service.logout(auth.session)
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -208,9 +220,10 @@ async def verify_email(
         await service.verify_email(input_.token)
     except InvalidCredentialToken as exc:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=t("Invalid or expired token"),
         ) from exc
-    return MessageOutput(message="Email verified")
+    return MessageOutput(message=t("Email verified"))
 
 
 @router.post("/verification-email", response_model=MessageOutput)
@@ -221,7 +234,7 @@ async def resend_verification(
 ) -> MessageOutput:
     await service.request_verification(Email(auth.account.email))
     return MessageOutput(
-        message="If the account needs verification, an email will be sent"
+        message=t("If the account needs verification, an email will be sent")
     )
 
 
@@ -233,7 +246,7 @@ async def request_password_reset(
 ) -> MessageOutput:
     await service.request_password_reset(Email(input_.email))
     return MessageOutput(
-        message="If the account exists, a password reset email will be sent"
+        message=t("If the account exists, a password reset email will be sent")
     )
 
 
@@ -249,7 +262,7 @@ async def confirm_password_reset(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
         ) from exc
-    return MessageOutput(message="Password updated; please log in again")
+    return MessageOutput(message=t("Password updated; please log in again"))
 
 
 @router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
@@ -266,7 +279,7 @@ async def change_password(
     except AuthenticationError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect",
+            detail=t("Current password is incorrect"),
         ) from exc
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     _clear_session_cookie(response)
