@@ -60,7 +60,7 @@ class CommonAuthenticatedSession:
     organization_id: uuid.UUID
 
 
-async def require_account_id(auth: FullyAuthenticatedSessionDep) -> CommonAuthenticatedSession:
+async def require_common_session(auth: FullyAuthenticatedSessionDep) -> CommonAuthenticatedSession:
     if auth.account.email_verified_at is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Verify your email to access this resource")
 
@@ -71,7 +71,7 @@ async def require_account_id(auth: FullyAuthenticatedSessionDep) -> CommonAuthen
 
 
 # Use in the system except for identity package
-CommonSessionDep = Annotated[CommonAuthenticatedSession, Depends(require_account_id)]
+CommonSessionDep = Annotated[CommonAuthenticatedSession, Depends(require_common_session)]
 
 
 def _trusted_origin(origin: str | None) -> bool:
