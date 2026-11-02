@@ -4,29 +4,29 @@ Domain model for an event management and ticketing platform (similar to Sympla).
 
 ## Product decisions that shape the model
 
-| Decision | Consequence |
-|---|---|
-| Free events use the same flow with price zero | No separate "registration" (*inscrição*) flow. A zero-total `Order` is confirmed without going through Payments. |
-| Tickets are nominal (named) and the attendee data is mandatory | Every order item carries attendee data (name, CPF, e-mail). Tickets are issued to a named holder. |
-| Money flows through the platform | The platform holds the funds and pays organizers out (*repasse*). Finance (ledger + payouts) is part of the MVP. Organizer verification (KYC) is required to sell paid tickets. |
-| Assigned seating will exist, but not in the MVP | Sales hides inventory behind an `Allocation` abstraction so that a future `Seating` context can plug in. |
-| No recurring events | An `Event` has a single period (`start_at` / `end_at`, possibly spanning several days). There is no `Session` entity. |
+| Decision                                                       | Consequence                                                                                                                                                                     |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Free events use the same flow with price zero                  | No separate "registration" (*inscrição*) flow. A zero-total `Order` is confirmed without going through Payments.                                                                |
+| Tickets are nominal (named) and the attendee data is mandatory | Every order item carries attendee data (name, CPF, e-mail). Tickets are issued to a named holder.                                                                               |
+| Money flows through the platform                               | The platform holds the funds and pays organizers out (*repasse*). Finance (ledger + payouts) is part of the MVP. Organizer verification (KYC) is required to sell paid tickets. |
+| Assigned seating will exist, but not in the MVP                | Sales hides inventory behind an `Allocation` abstraction so that a future `Seating` context can plug in.                                                                        |
+| No recurring events                                            | An `Event` has a single period (`start_at` / `end_at`, possibly spanning several days). There is no `Session` entity.                                                           |
 
 ## Subdomains
 
-| Type | Subdomain | Why |
-|---|---|---|
-| **Core** | Event Management | How organizers create, configure and publish events |
-| **Core** | Sales | Ticket batches (*lotes*), inventory, reservations, orders. Hardest rules: overselling, concurrency, per-CPF limits |
-| **Core** | Ticketing | The ticket as a right of entry: named holder, transfer, invalidation |
-| **Core** | Check-in | Gate validation, anti-fraud, offline operation (later) |
-| **Supporting** | Organizers | Organization onboarding, team, KYC, payout account |
-| **Supporting** | Finance | Fees, ledger, organizer balance, payouts, chargebacks |
-| **Supporting** | Discovery | Search, storefront, categories (post-MVP) |
-| **Generic** | Identity & Access | Login, OAuth, MFA (use an existing library/service) |
-| **Generic** | Payments | Payment gateway integration (PIX, credit card) |
-| **Generic** | Notifications | E-mail, push, WhatsApp |
-| **Generic** | Fiscal | Service invoices (*NFS-e*) on platform fees (post-MVP) |
+| Type           | Subdomain         | Why                                                                                                                |
+| -------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Core**       | Event Management  | How organizers create, configure and publish events                                                                |
+| **Core**       | Sales             | Ticket batches (*lotes*), inventory, reservations, orders. Hardest rules: overselling, concurrency, per-CPF limits |
+| **Core**       | Ticketing         | The ticket as a right of entry: named holder, transfer, invalidation                                               |
+| **Core**       | Check-in          | Gate validation, anti-fraud, offline operation (later)                                                             |
+| **Supporting** | Organizers        | Organization onboarding, team, KYC, payout account                                                                 |
+| **Supporting** | Finance           | Fees, ledger, organizer balance, payouts, chargebacks                                                              |
+| **Supporting** | Discovery         | Search, storefront, categories (post-MVP)                                                                          |
+| **Generic**    | Identity & Access | Login, OAuth, MFA (use an existing library/service)                                                                |
+| **Generic**    | Payments          | Payment gateway integration (PIX, credit card)                                                                     |
+| **Generic**    | Notifications     | E-mail, push, WhatsApp                                                                                             |
+| **Generic**    | Fiscal            | Service invoices (*NFS-e*) on platform fees (post-MVP)                                                             |
 
 ## Contexts
 
@@ -37,7 +37,7 @@ Each context section lists its aggregates, the invariants it owns, and the integ
 - **Responsibility:** authentication, credentials, sessions, platform-level roles (e.g. platform admin).
 - **Aggregates:** `Account` (id, e-mail, credentials, status).
 - **Rule:** this context knows nothing about buyers or organizers. Every other context gives the person its own name and meaning (see [Ubiquitous language](#ubiquitous-language)).
-- **Publishes:** `AccountRegistered`, `AccountDeactivated`.
+- **Publishes:** `AccountLoggedIn`, `AccountWasDeactivated`.
 
 ### Organizers
 
@@ -49,7 +49,7 @@ Each context section lists its aggregates, the invariants it owns, and the integ
   - An organization always has at least one owner.
   - An organization can sell **paid** tickets only if it is verified and has a verified `PayoutAccount`. Free events have no such requirement.
 - **Publishes:** `OrganizationCreated`, `MemberAdded`, `MemberRemoved`, `OrganizationVerified`, `PayoutAccountVerified`.
-- **Consumes:** `AccountDeactivated`.
+- **Consumes:** `AccountWasDeactivated`.
 
 ### Event Management
 
@@ -221,15 +221,15 @@ Each context section lists its aggregates, the invariants it owns, and the integ
 
 The same human being has a different name, and a different model, in each context. Buyer ≠ attendee: one person can buy four tickets for friends.
 
-| Context | Term | Meaning |
-|---|---|---|
-| Identity & Access | Account | Someone who can log in |
-| Organizers | Member / Owner | A person working for an organization |
-| Sales | Buyer | Who places and pays for the order |
-| Sales | AttendeeInfo | Who will attend, as declared at checkout |
-| Ticketing | Holder | Current owner of a ticket |
-| Check-in | Attendee / Operator | Who enters / who scans |
-| Finance | Payee | The organization receiving a payout |
+| Context           | Term                | Meaning                                  |
+| ----------------- | ------------------- | ---------------------------------------- |
+| Identity & Access | Account             | Someone who can log in                   |
+| Organizers        | Member / Owner      | A person working for an organization     |
+| Sales             | Buyer               | Who places and pays for the order        |
+| Sales             | AttendeeInfo        | Who will attend, as declared at checkout |
+| Ticketing         | Holder              | Current owner of a ticket                |
+| Check-in          | Attendee / Operator | Who enters / who scans                   |
+| Finance           | Payee               | The organization receiving a payout      |
 
 Other terms:
 
