@@ -8,8 +8,8 @@ from typing import Annotated
 from fastapi.concurrency import run_in_threadpool
 from pwdlib import PasswordHash
 from redis.asyncio import Redis
-from shared.infra.authentication.token_encryption import encrypt_authentication_token
 from shared.infra.di import Depends
+from shared.infra.encryption.token import encrypt_authentication_token
 from shared.infra.redis import RedisDep
 
 from identity.domain.models.account.account import (
@@ -19,6 +19,7 @@ from identity.domain.models.account.account import (
     Session,
 )
 from identity.domain.models.account.errors import (
+    AccountNotFound,
     AuthenticationError,
     DuplicateAccountEmail,
     InvalidCredentialToken,
@@ -26,6 +27,7 @@ from identity.domain.models.account.errors import (
 from identity.domain.models.account.events import (
     AccountLoggedIn,
     AccountVerificationRequested,
+    AccountWasDeactivated,
     PasswordResetRequested,
 )
 from identity.domain.models.account.repository import (
@@ -152,6 +154,36 @@ class IdentityService:
     async def logout(self, session: Session, *, now: datetime | None = None) -> None:
         session.revoked_at = now or datetime.now(UTC)
         await self._repository.save()
+
+    async def deactivate_account(self, account_id: uuid.UUID, *, now: datetime | None = None) -> Account:
+        """Deactivates an account and publishes the change atomically."""
+        now = now or datetime.now(UTC)
+        account = await self._repository.get_account(account_id)
+        if account is None:
+            raise AccountNotFound(f"Account {account_id} not found")
+
+        if account.deactivated_at is not None:
+            return account
+
+        account.deactivated_at = now
+        sessions = await self._repository.get_active_sessions(account.id)
+        for session in sessions:
+            session.revoked_at = now
+
+        credentials = []
+        for purpose in CredentialPurpose:
+            active_credentials = await self._repository.get_unconsumed_credentials(account.id, purpose)
+            for credential in active_credentials:
+                credential.consumed_at = now
+            credentials.extend(active_credentials)
+
+        await self._repository.save(
+            account,
+            *sessions,
+            *credentials,
+            events=[AccountWasDeactivated(account.id)],
+        )
+        return account
 
     async def verify_email(self, token: str, *, now: datetime | None = None) -> Account:
         return await self._consume_credential(token, CredentialPurpose.EMAIL_VERIFICATION, now=now)

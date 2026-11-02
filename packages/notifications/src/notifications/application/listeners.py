@@ -3,7 +3,7 @@ from urllib.parse import quote
 import resend
 from identity.domain.models.account.events import AccountVerificationRequested, PasswordResetRequested
 from libs.events import listener
-from shared.infra.authentication.token_encryption import decrypt_authentication_token
+from shared.infra.encryption.token import decrypt_authentication_token
 from shared.infra.logger import logger
 from shared.settings import settings
 

@@ -1,0 +1,1 @@
+"""Payout account aggregate."""
