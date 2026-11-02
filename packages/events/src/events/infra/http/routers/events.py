@@ -1,9 +1,8 @@
-import uuid
 from io import BytesIO
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
-from identity.infra.http.authentication import CSRFDep, CurrentAccountID
+from identity.infra.http.authentication import CommonSessionDep, CSRFDep
 from pydantic import ValidationError
 
 from events.application.event.image import (
@@ -22,7 +21,7 @@ from events.application.event.values import (
 from events.domain.models.event.event import Event
 from events.domain.models.event.values import EventID, EventStatus
 
-router = APIRouter(tags=["events"])
+router = APIRouter(prefix="/events", tags=["events"])
 # TODO authorize that the authenticated account belongs to the event's organization.
 
 MAX_BANNER_SIZE = 5 * 1024 * 1024
@@ -64,15 +63,14 @@ async def _read_banner(file: UploadFile) -> EventBannerUpload:
 
 
 @router.post(
-    "/organizations/{organization_id}/events",
+    "",
     status_code=status.HTTP_201_CREATED,
 )
 async def create_event(
-    organization_id: uuid.UUID,
     event: Annotated[str, Form()],
     service: EventServiceDep,
     image_service: EventImageServiceDep,
-    _account_id: CurrentAccountID,
+    session: CommonSessionDep,
     _csrf: CSRFDep,
     banner: Annotated[UploadFile | None, File()] = None,
 ) -> EventOutput:
@@ -83,7 +81,7 @@ async def create_event(
 
     upload = await _read_banner(banner) if banner else None
     created = await service.create(
-        organization_id=organization_id,
+        organization_id=session.organization_id,
         title=input_.title,
         description=input_.description,
         age_rating=input_.age_rating,
@@ -94,83 +92,83 @@ async def create_event(
     return _output(created, image_service)
 
 
-@router.get("/organizations/{organization_id}/events")
+@router.get("")
 async def list_organization_events(
-    organization_id: uuid.UUID,
     service: EventServiceDep,
     image_service: EventImageServiceDep,
+    session: CommonSessionDep,
     status_: Annotated[EventStatus | None, Query(alias="status")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[EventOutput]:
     events = await service.list_by_organization(
-        organization_id, status=status_, limit=limit, offset=offset
+        session.organization_id, status=status_, limit=limit, offset=offset
     )
     return [_output(event, image_service) for event in events]
 
 
-@router.get("/events/{event_id}")
+@router.get("/{event_id}")
 async def get_event(
     event_id: EventID, service: EventServiceDep, image_service: EventImageServiceDep
 ) -> EventOutput:
     return _output(await service.get(event_id), image_service)
 
 
-@router.put("/events/{event_id}")
+@router.put("/{event_id}")
 async def update_event(
     event_id: EventID,
     input_: UpdateEventInput,
     service: EventServiceDep,
     image_service: EventImageServiceDep,
-    _account_id: CurrentAccountID,
+    _session: CommonSessionDep,
     _csrf: CSRFDep,
 ) -> EventOutput:
     event = await service.update(event_id, input_.to_update())
     return _output(event, image_service)
 
 
-@router.post("/events/{event_id}/publish")
+@router.post("/{event_id}/publish")
 async def publish_event(
     event_id: EventID,
     service: EventServiceDep,
     image_service: EventImageServiceDep,
-    _account_id: CurrentAccountID,
+    _session: CommonSessionDep,
     _csrf: CSRFDep,
 ) -> EventOutput:
     return _output(await service.publish(event_id), image_service)
 
 
-@router.post("/events/{event_id}/postpone")
+@router.post("/{event_id}/postpone")
 async def postpone_event(
     event_id: EventID,
     input_: PeriodSchema,
     service: EventServiceDep,
     image_service: EventImageServiceDep,
-    _account_id: CurrentAccountID,
+    _session: CommonSessionDep,
     _csrf: CSRFDep,
 ) -> EventOutput:
     return _output(await service.postpone(event_id, input_.to_domain()), image_service)
 
 
-@router.post("/events/{event_id}/cancel")
+@router.post("/{event_id}/cancel")
 async def cancel_event(
     event_id: EventID,
     input_: CancelEventInput,
     service: EventServiceDep,
     image_service: EventImageServiceDep,
-    _account_id: CurrentAccountID,
+    _session: CommonSessionDep,
     _csrf: CSRFDep,
 ) -> EventOutput:
     return _output(await service.cancel(event_id, input_.reason), image_service)
 
 
-@router.put("/events/{event_id}/banner")
+@router.put("/{event_id}/banner")
 async def replace_event_banner(
     event_id: EventID,
     banner: Annotated[UploadFile, File()],
     service: EventServiceDep,
     image_service: EventImageServiceDep,
-    _account_id: CurrentAccountID,
+    _session: CommonSessionDep,
     _csrf: CSRFDep,
 ) -> EventOutput:
     upload = await _read_banner(banner)

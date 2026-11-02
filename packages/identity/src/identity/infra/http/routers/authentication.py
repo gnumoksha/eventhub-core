@@ -16,8 +16,8 @@ from identity.domain.models.account.errors import (
 )
 from identity.domain.models.values import Email, Password
 from identity.infra.http.authentication import (
-    AuthenticatedSessionDep,
     CSRFDep,
+    FullyAuthenticatedSessionDep,
     IdentityServiceDep,
     TrustedOriginDep,
     session_cookie_name,
@@ -180,7 +180,7 @@ async def login(
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
-    auth: AuthenticatedSessionDep, service: IdentityServiceDep, _csrf: CSRFDep
+    auth: FullyAuthenticatedSessionDep, service: IdentityServiceDep, _csrf: CSRFDep
 ) -> Response:
     await service.logout(auth.session)
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -189,13 +189,13 @@ async def logout(
 
 
 @router.get("/me", response_model=AccountOutput)
-async def me(auth: AuthenticatedSessionDep) -> AccountOutput:
+async def me(auth: FullyAuthenticatedSessionDep) -> AccountOutput:
     return _account_output(auth.account)
 
 
 @router.get("/csrf")
 async def get_csrf(
-    auth: AuthenticatedSessionDep, _origin: TrustedOriginDep
+    auth: FullyAuthenticatedSessionDep, _origin: TrustedOriginDep
 ) -> dict[str, str]:
     return {"csrf_token": _csrf_for(auth.raw_token)}
 
@@ -215,7 +215,7 @@ async def verify_email(
 
 @router.post("/verification-email", response_model=MessageOutput)
 async def resend_verification(
-    auth: AuthenticatedSessionDep,
+    auth: FullyAuthenticatedSessionDep,
     service: IdentityServiceDep,
     _csrf: CSRFDep,
 ) -> MessageOutput:
@@ -255,7 +255,7 @@ async def confirm_password_reset(
 @router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
 async def change_password(
     input_: ChangePasswordInput,
-    auth: AuthenticatedSessionDep,
+    auth: FullyAuthenticatedSessionDep,
     service: IdentityServiceDep,
     _csrf: CSRFDep,
 ) -> Response:

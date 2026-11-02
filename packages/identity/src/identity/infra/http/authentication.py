@@ -13,6 +13,7 @@ from identity.domain.models.account.account import Account, Session
 
 SESSION_COOKIE = "__Host-eventhub_session"
 DEV_SESSION_COOKIE = "eventhub_session"
+TEMPORARY_ORGANIZATION_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")
 
 
 def session_cookie_name() -> str:
@@ -40,23 +41,37 @@ async def require_session(
 ) -> AuthenticatedSession:
     if token is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
     authenticated = await service.authenticate_session(token)
     if authenticated is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
     session, account = authenticated
     return AuthenticatedSession(session, account, token)
 
 
-AuthenticatedSessionDep = Annotated[AuthenticatedSession, Depends(require_session)]
+# Use only in identity package
+FullyAuthenticatedSessionDep = Annotated[AuthenticatedSession, Depends(require_session)]
 
 
-async def require_account_id(auth: AuthenticatedSessionDep) -> uuid.UUID:
+@dataclass(frozen=True)
+class CommonAuthenticatedSession:
+    account_id: uuid.UUID
+    organization_id: uuid.UUID
+
+
+async def require_account_id(auth: FullyAuthenticatedSessionDep) -> CommonAuthenticatedSession:
     if auth.account.email_verified_at is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Verify your email to access this resource")
-    return auth.account.id
+
+    return CommonAuthenticatedSession(
+        account_id=auth.account.id,
+        organization_id=TEMPORARY_ORGANIZATION_ID,
+    )
 
 
-CurrentAccountID = Annotated[uuid.UUID, Depends(require_account_id)]
+# Use in the system except for identity package
+CommonSessionDep = Annotated[CommonAuthenticatedSession, Depends(require_account_id)]
 
 
 def _trusted_origin(origin: str | None) -> bool:
@@ -80,7 +95,7 @@ TrustedOriginDep = Annotated[None, Depends(require_trusted_origin)]
 
 async def require_csrf(
     request: Request,
-    auth: AuthenticatedSessionDep,
+    auth: FullyAuthenticatedSessionDep,
     csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
 ) -> None:
     if not _trusted_origin(request.headers.get("origin")):

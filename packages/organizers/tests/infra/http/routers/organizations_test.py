@@ -3,7 +3,11 @@ import uuid
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from identity.infra.http.authentication import require_account_id, require_csrf
+from identity.infra.http.authentication import (
+    CommonAuthenticatedSession,
+    require_account_id,
+    require_csrf,
+)
 from organizers.application.organization.service import OrganizationService, __get_service
 from organizers.application.payout_account.service import (
     PayoutAccountService,
@@ -21,7 +25,10 @@ def client(service: OrganizationService, payout_account_service: PayoutAccountSe
     active_account = {"id": uuid.uuid4()}
     app.dependency_overrides[__get_service] = lambda: service
     app.dependency_overrides[__get_payout_account_service] = lambda: payout_account_service
-    app.dependency_overrides[require_account_id] = lambda: active_account["id"]
+    app.dependency_overrides[require_account_id] = lambda: CommonAuthenticatedSession(
+        account_id=active_account["id"],
+        organization_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
+    )
     app.dependency_overrides[require_csrf] = lambda: None
     return TestClient(app), active_account
 

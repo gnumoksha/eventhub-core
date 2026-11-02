@@ -8,7 +8,11 @@ from events.application.event.service import EventService, __get_service
 from events.infra.http.routers.setup import setup_routers
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from identity.infra.http.authentication import require_account_id, require_csrf
+from identity.infra.http.authentication import (
+    CommonAuthenticatedSession,
+    require_account_id,
+    require_csrf,
+)
 
 from tests.conftest import NOW, InMemoryEventImageService
 
@@ -19,7 +23,10 @@ def client(service: EventService, image_service: InMemoryEventImageService) -> T
     setup_routers(app)
     app.dependency_overrides[__get_service] = lambda: service
     app.dependency_overrides[__get_image_service] = lambda: image_service
-    app.dependency_overrides[require_account_id] = lambda: uuid.uuid4()  # noqa: PLW0108
+    app.dependency_overrides[require_account_id] = lambda: CommonAuthenticatedSession(
+        account_id=uuid.uuid4(),
+        organization_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
+    )
     app.dependency_overrides[require_csrf] = lambda: None
     return TestClient(app)
 
@@ -49,9 +56,9 @@ def event_payload() -> dict:
     }
 
 
-def create_event(client: TestClient, organization_id: uuid.UUID | None = None) -> dict:
+def create_event(client: TestClient) -> dict:
     response = client.post(
-        f"/organizations/{organization_id or uuid.uuid4()}/events",
+        "/events",
         data={"event": json.dumps(event_payload())},
     )
     assert response.status_code == 201, response.text
@@ -90,12 +97,11 @@ def test_full_lifecycle(client: TestClient):
 
 
 def test_list_organization_events(client: TestClient):
-    organization_id = uuid.uuid4()
-    first = create_event(client, organization_id)
-    create_event(client, organization_id)
+    first = create_event(client)
+    create_event(client)
     client.post(f"/events/{first['id']}/publish")
 
-    response = client.get(f"/organizations/{organization_id}/events", params={"status": "PUBLISHED"})
+    response = client.get("/events", params={"status": "PUBLISHED"})
 
     assert response.status_code == 200
     assert [e["id"] for e in response.json()] == [first["id"]]
@@ -131,7 +137,7 @@ def test_invalid_domain_value_returns_422(client: TestClient):
     payload = event_payload()
     payload["venue"]["address"]["postal_code"] = "123"
 
-    response = client.post(f"/organizations/{uuid.uuid4()}/events", json=payload)
+    response = client.post("/events", json=payload)
 
     assert response.status_code == 422
 
@@ -142,7 +148,7 @@ def test_unknown_event_returns_404(client: TestClient):
 
 def test_create_event_with_banner(client: TestClient):
     response = client.post(
-        f"/organizations/{uuid.uuid4()}/events",
+        "/events",
         data={"event": json.dumps(event_payload())},
         files={"banner": ("banner.png", b"\x89PNG\r\n\x1a\nimage", "image/png")},
     )
@@ -165,7 +171,7 @@ def test_replace_event_banner(client: TestClient):
 
 def test_reject_banner_with_mismatched_signature(client: TestClient):
     response = client.post(
-        f"/organizations/{uuid.uuid4()}/events",
+        "/events",
         data={"event": json.dumps(event_payload())},
         files={"banner": ("banner.png", b"not png", "image/png")},
     )
