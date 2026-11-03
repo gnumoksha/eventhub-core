@@ -2,7 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Response, status
-from identity.infra.http.authentication import CSRFDep, CurrentAccountID
+from identity.infra.http.authentication import CommonSessionDep, CSRFDep
 from pydantic import BaseModel
 
 from organizers.application.organization.service import (
@@ -108,35 +108,38 @@ def _mask_value(value: str | None) -> str | None:
 async def create_organization(
     input_: CreateOrganizationInput,
     service: OrganizationServiceDep,
-    account_id: CurrentAccountID,
+    session: CommonSessionDep,
     _csrf: CSRFDep,
 ) -> OrganizationOutput:
     organization = await service.create(
-        owner_account_id=account_id,
+        owner_account_id=session.account_id,
         organization_type=input_.organization_type,
         public_name=input_.public_name,
         legal_name=input_.legal_name,
         tax_id=input_.tax_id,
     )
-    return _organization_output(organization, account_id)
+    return _organization_output(organization, session.account_id)
 
 
 @router.get("")
 async def list_organizations(
-    service: OrganizationServiceDep, account_id: CurrentAccountID
+    service: OrganizationServiceDep, session: CommonSessionDep
 ) -> list[OrganizationOutput]:
     return [
-        _organization_output(org, account_id)
-        for org in await service.list_for_account(account_id)
+        _organization_output(org, session.account_id)
+        for org in await service.list_for_account(session.account_id)
     ]
 
 
 @router.get("/{organization_id}")
 async def get_organization(
-    organization_id: UUID, service: OrganizationServiceDep, account_id: CurrentAccountID
+    organization_id: UUID,
+    service: OrganizationServiceDep,
+    session: CommonSessionDep,
 ) -> OrganizationOutput:
     return _organization_output(
-        await _get_organization(service, organization_id, account_id), account_id
+        await _get_organization(service, organization_id, session.account_id),
+        session.account_id,
     )
 
 
@@ -145,24 +148,26 @@ async def update_organization(
     organization_id: UUID,
     input_: UpdateOrganizationInput,
     service: OrganizationServiceDep,
-    account_id: CurrentAccountID,
+    session: CommonSessionDep,
     _csrf: CSRFDep,
 ) -> OrganizationOutput:
     organization = await service.update_profile(
         organization_id,
-        account_id,
+        session.account_id,
         public_name=input_.public_name,
         legal_name=input_.legal_name,
         tax_id=input_.tax_id,
     )
-    return _organization_output(organization, account_id)
+    return _organization_output(organization, session.account_id)
 
 
 @router.get("/{organization_id}/members")
 async def list_members(
-    organization_id: UUID, service: OrganizationServiceDep, account_id: CurrentAccountID
+    organization_id: UUID,
+    service: OrganizationServiceDep,
+    session: CommonSessionDep,
 ) -> list[MemberOutput]:
-    organization = await _get_organization(service, organization_id, account_id)
+    organization = await _get_organization(service, organization_id, session.account_id)
     return [
         MemberOutput(account_id=member.account_id, role=member.role)
         for member in organization.members
@@ -174,11 +179,11 @@ async def add_member(
     organization_id: UUID,
     input_: AddMemberInput,
     service: OrganizationServiceDep,
-    account_id: CurrentAccountID,
+    session: CommonSessionDep,
     _csrf: CSRFDep,
 ) -> list[MemberOutput]:
     organization = await service.add_member(
-        organization_id, account_id, input_.account_id, input_.role
+        organization_id, session.account_id, input_.account_id, input_.role
     )
     return [
         MemberOutput(account_id=member.account_id, role=member.role)
@@ -194,10 +199,10 @@ async def remove_member(
     organization_id: UUID,
     member_account_id: UUID,
     service: OrganizationServiceDep,
-    account_id: CurrentAccountID,
+    session: CommonSessionDep,
     _csrf: CSRFDep,
 ) -> Response:
-    await service.remove_member(organization_id, account_id, member_account_id)
+    await service.remove_member(organization_id, session.account_id, member_account_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -205,11 +210,12 @@ async def remove_member(
 async def submit_verification(
     organization_id: UUID,
     service: OrganizationServiceDep,
-    account_id: CurrentAccountID,
+    session: CommonSessionDep,
     _csrf: CSRFDep,
 ) -> OrganizationOutput:
     return _organization_output(
-        await service.submit_verification(organization_id, account_id), account_id
+        await service.submit_verification(organization_id, session.account_id),
+        session.account_id,
     )
 
 
@@ -218,12 +224,12 @@ async def submit_payout_account(
     organization_id: UUID,
     input_: Annotated[PayoutAccountInput, Body(discriminator="method")],
     service: PayoutAccountServiceDep,
-    account_id: CurrentAccountID,
+    session: CommonSessionDep,
     _csrf: CSRFDep,
 ) -> PayoutAccountOutput:
     payout_account = await service.submit(
         organization_id,
-        account_id,
+        session.account_id,
         details=input_.to_domain(),
     )
     return _payout_output(payout_account)
@@ -233,9 +239,11 @@ async def submit_payout_account(
 async def get_payout_account(
     organization_id: UUID,
     service: PayoutAccountServiceDep,
-    account_id: CurrentAccountID,
+    session: CommonSessionDep,
 ) -> dict[str, PayoutAccountOutput | None]:
-    current, pending = await service.get_for_organization(organization_id, account_id)
+    current, pending = await service.get_for_organization(
+        organization_id, session.account_id
+    )
     return {
         "current": _payout_output(current) if current else None,
         "pending": _payout_output(pending) if pending else None,
