@@ -32,14 +32,14 @@ class LocaleMiddleware(BaseHTTPMiddleware):
         """
         accept_language = request.headers.get("Accept-Language", "")
 
-        locale = __get_best_locale_match(accept_language, self.default_locale, self.supported_locales)
+        locale = get_best_locale_match(accept_language, self.default_locale, self.supported_locales)
 
         set_locale(locale)
 
         return await call_next(request)
 
 
-def __get_best_locale_match(
+def get_best_locale_match(
     accept_language: str,
     default_locale: str,
     supported_locales: list[str],

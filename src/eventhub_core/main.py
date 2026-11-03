@@ -78,25 +78,31 @@ app.add_middleware(
 
 
 @app.exception_handler(500)
-async def http_exception_handler(request: Request, exc: Exception):  # noqa: ARG001
+async def http_exception_handler(_request: Request, exc: Exception):
     import traceback  # noqa: PLC0415
 
     from fastapi.responses import JSONResponse  # noqa: PLC0415
 
-    msg = "Internal server error"
-
     if settings.is_dev_like():
         msg = str(exc)
-        logger.error(
-            "Error %s %s ",
+        trace = list(traceback.TracebackException.from_exception(exc).format())
+        logger.exception(
+            "Error %s ",
             str(exc),
-            list(traceback.TracebackException.from_exception(exc).format()),
+        )
+
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": msg,
+                "traceback": trace,
+            },
         )
 
     return JSONResponse(
         status_code=500,
         content={
-            "detail": msg,
+            "detail": "Internal server error",
         },
     )
 
