@@ -21,14 +21,12 @@ from organizers.domain.models.organization.values import (
     NAME_MAX_LENGTH,
     REJECTION_REASON_MAX_LENGTH,
     AccountID,
-    LegalName,
     MemberRole,
     OrganizationID,
-    OrganizationProfile,
-    OrganizationType,
+    OrganizationLegalProfile,
     OrganizationVerificationRejectionReason,
     PublicName,
-    TaxIdentifier,
+    TaxIDType,
     VerificationStatus,
 )
 from organizers.domain.models.payout_account.values import PayoutAccountID
@@ -39,10 +37,10 @@ class Organization(SQLModel, table=True):
     __table_args__ = {"schema": "organizers"}
 
     id: OrganizationID = Field(default_factory=uuid_compat.uuid7, primary_key=True)
-    organization_type: OrganizationType = Field(sa_type=Enum(OrganizationType, inherit_schema=True))
+    tax_id_type: TaxIDType | None = Field(default=None, sa_type=Enum(TaxIDType, inherit_schema=True))
     public_name: str = Field(max_length=NAME_MAX_LENGTH)
-    legal_name: str = Field(sa_type=EncryptedString(settings.PERSONAL_DATA_ENCRYPTION_KEY))
-    tax_id: str = Field(sa_type=EncryptedString(settings.PERSONAL_DATA_ENCRYPTION_KEY))
+    legal_name: str | None = Field(default=None, sa_type=EncryptedString(settings.PERSONAL_DATA_ENCRYPTION_KEY))
+    tax_id: str | None = Field(default=None, sa_type=EncryptedString(settings.PERSONAL_DATA_ENCRYPTION_KEY))
     verification_status: VerificationStatus = Field(
         default=VerificationStatus.NOT_SUBMITTED,
         sa_type=Enum(VerificationStatus, inherit_schema=True),
@@ -74,18 +72,16 @@ class Organization(SQLModel, table=True):
     def create(
         cls,
         *,
-        profile: OrganizationProfile,
+        public_name: str,
         owner_account_id: AccountID,
         now: datetime,
     ) -> Self:
-        public_name = PublicName(profile.public_name).value
-        legal_name = LegalName(profile.legal_name).value
-        tax_id = TaxIdentifier(profile.tax_id, profile.organization_type).value
+        public_name_value = PublicName(public_name).value
         organization = cls(
-            organization_type=profile.organization_type,
-            public_name=public_name,
-            legal_name=legal_name,
-            tax_id=tax_id,
+            public_name=public_name_value,
+            legal_name=None,
+            tax_id=None,
+            tax_id_type=None,
             verification_status=VerificationStatus.NOT_SUBMITTED,
             created_at=now,
             updated_at=now,
@@ -131,12 +127,13 @@ class Organization(SQLModel, table=True):
         self.public_name = PublicName(public_name).value
         self._touch(now)
 
-    def update_legal_profile(self, legal_name: str, tax_id: str, *, now: datetime) -> None:
+    def update_legal_profile(self, profile: OrganizationLegalProfile, *, now: datetime) -> None:
         if self.verification_status not in (VerificationStatus.NOT_SUBMITTED, VerificationStatus.REJECTED):
             raise InvalidStateTransition("Legal details can only be changed before submission or after rejection")
 
-        self.legal_name = LegalName(legal_name).value
-        self.tax_id = TaxIdentifier(tax_id, self.organization_type).value
+        self.legal_name = profile.legal_name
+        self.tax_id = profile.tax_id
+        self.tax_id_type = profile.tax_id_type
         self._touch(now)
 
     def submit_verification(self, *, now: datetime) -> None:
@@ -144,6 +141,8 @@ class Organization(SQLModel, table=True):
             raise InvalidStateTransition(
                 "Verification can only be submitted when it has not been submitted or was rejected"
             )
+        if self.legal_name is None or self.tax_id is None or self.tax_id_type is None:
+            raise InvalidStateTransition("Complete the legal profile before submitting verification")
 
         self.verification_status = VerificationStatus.PENDING
         self.verification_rejection_reason = None

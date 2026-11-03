@@ -7,43 +7,54 @@ from shared.domain.values.financial import Pix, PixKeyType
 
 from organizers.domain.models.organization.values import (
     MemberRole,
-    OrganizationType,
+    OrganizationLegalProfile,
     TaxIdentifier,
+    TaxIDType,
 )
 from organizers.domain.models.payout_account.values import BankPayoutDetails, PayoutMethod, PixPayoutDetails
 
 
 class CreateOrganizationInput(BaseModel):
-    organization_type: OrganizationType
     public_name: str = Field(min_length=1, max_length=200)
-    legal_name: str = Field(min_length=1, max_length=200)
-    tax_id: str = Field(min_length=11, max_length=18)
-
-    @field_validator("tax_id")
-    @classmethod
-    def validate_tax_id(cls, value: str, info: ValidationInfo) -> str:
-        organization_type = info.data.get("organization_type")
-        if organization_type is None:
-            return value
-
-        try:
-            return TaxIdentifier(value, organization_type).value
-        except InvalidValue as exc:
-            raise ValueError(exc.message) from exc
 
 
 class UpdateOrganizationInput(BaseModel):
     public_name: str | None = Field(default=None, min_length=1, max_length=200)
     legal_name: str | None = Field(default=None, min_length=1, max_length=200)
+    tax_id_type: TaxIDType | None = None
     tax_id: str | None = Field(default=None, min_length=11, max_length=18)
+
+    @field_validator("tax_id")
+    @classmethod
+    def validate_tax_id(cls, value: str | None, info: ValidationInfo) -> str | None:
+        tax_id_type = info.data.get("tax_id_type")
+        if value is None or tax_id_type is None:
+            return value
+
+        try:
+            return TaxIdentifier(value, tax_id_type).value
+        except InvalidValue as exc:
+            raise ValueError(exc.message) from exc
 
     @model_validator(mode="after")
     def require_updates(self):
-        if self.public_name is None and self.legal_name is None and self.tax_id is None:
+        if self.public_name is None and self.legal_name is None and self.tax_id_type is None and self.tax_id is None:
             raise ValueError("At least one field must be updated")
-        if (self.legal_name is None) != (self.tax_id is None):
-            raise ValueError("Legal name and tax ID must be updated together")
+        legal_profile = (self.legal_name, self.tax_id_type, self.tax_id)
+        if any(value is not None for value in legal_profile) and any(value is None for value in legal_profile):
+            raise ValueError("Legal name, tax ID type and tax ID must be updated together")
         return self
+
+    def to_legal_profile(self) -> OrganizationLegalProfile | None:
+        if self.legal_name is None:
+            return None
+        if self.tax_id is None or self.tax_id_type is None:
+            raise ValueError("Legal name, tax ID type and tax ID must be updated together")
+        return OrganizationLegalProfile(
+            legal_name=self.legal_name,
+            tax_id=self.tax_id,
+            tax_id_type=self.tax_id_type,
+        )
 
 
 class AddMemberInput(BaseModel):

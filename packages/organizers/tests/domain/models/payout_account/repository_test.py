@@ -5,7 +5,7 @@ import pytest_asyncio
 from cryptography.fernet import Fernet
 from organizers.domain.models.organization.organization import Organization
 from organizers.domain.models.organization.repository import OrganizationRepository
-from organizers.domain.models.organization.values import OrganizationID, OrganizationProfile, OrganizationType
+from organizers.domain.models.organization.values import OrganizationID, OrganizationLegalProfile, TaxIDType
 from organizers.domain.models.payout_account.payout_account import PayoutAccount
 from organizers.domain.models.payout_account.repository import PayoutAccountRepository
 from organizers.domain.models.payout_account.values import PayoutAccountStatus, PixPayoutDetails
@@ -57,23 +57,20 @@ def payout_account_repository(session: AsyncSession) -> PayoutAccountRepository:
 
 @pytest.fixture
 def organization() -> Organization:
-    return Organization.create(
-        profile=OrganizationProfile(
-            OrganizationType.INDIVIDUAL,
-            "Event Crew",
-            "Maria da Silva",
-            "52998224725",
-        ),
+    organization = Organization.create(
+        public_name="Event Crew",
         owner_account_id=OrganizationID("018d0e91-3d0b-7000-8000-000000000001"),
         now=NOW,
     )
+    organization.update_legal_profile(OrganizationLegalProfile("Maria da Silva", "52998224725", TaxIDType.CPF), now=NOW)
+    return organization
 
 
 @pytest.fixture
 def payout_account(organization: Organization) -> PayoutAccount:
     return PayoutAccount.create_pix(
         organization_id=organization.id,
-        organization_type=OrganizationType.INDIVIDUAL,
+        tax_id_type=TaxIDType.CPF,
         details=PixPayoutDetails(Pix("maria@example.com", PixKeyType.EMAIL), "Maria da Silva", "52998224725"),
         now=NOW,
     )
@@ -117,7 +114,7 @@ async def test_lists_only_pending_payout_accounts(
     await organization_repository.save(organization)
     verified = PayoutAccount.create_pix(
         organization_id=organization.id,
-        organization_type=OrganizationType.INDIVIDUAL,
+        tax_id_type=TaxIDType.CPF,
         details=PixPayoutDetails(Pix("verified@example.com", PixKeyType.EMAIL), "Maria da Silva", "52998224725"),
         now=NOW,
     )

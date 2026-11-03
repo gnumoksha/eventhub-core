@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from libs.time_utils import Clock, utc_now
-from shared.domain.errors import InvalidStateTransition
 from shared.infra.di import Depends
 
 from organizers.domain.models.organization.errors import (
@@ -14,9 +13,7 @@ from organizers.domain.models.organization.values import (
     AccountID,
     MemberRole,
     OrganizationID,
-    OrganizationProfile,
-    OrganizationType,
-    TaxIdentifier,
+    OrganizationLegalProfile,
 )
 
 
@@ -29,14 +26,10 @@ class OrganizationService:
         self,
         *,
         owner_account_id: AccountID,
-        organization_type: OrganizationType,
         public_name: str,
-        legal_name: str,
-        tax_id: str,
     ) -> Organization:
-        tax_id = TaxIdentifier(tax_id, organization_type).value
         organization = Organization.create(
-            profile=OrganizationProfile(organization_type, public_name, legal_name, tax_id),
+            public_name=public_name,
             owner_account_id=owner_account_id,
             now=self._clock(),
         )
@@ -66,14 +59,11 @@ class OrganizationService:
         account_id: AccountID,
         *,
         public_name: str | None = None,
-        legal_name: str | None = None,
-        tax_id: str | None = None,
+        legal_profile: OrganizationLegalProfile | None = None,
     ) -> Organization:
         organization = await self._get_owner_organization(organization_id, account_id)
-        if legal_name is not None or tax_id is not None:
-            if legal_name is None or tax_id is None:
-                raise InvalidStateTransition("Legal name and tax ID must be updated together")
-            organization.update_legal_profile(legal_name, tax_id, now=self._clock())
+        if legal_profile is not None:
+            organization.update_legal_profile(legal_profile, now=self._clock())
         if public_name is not None:
             organization.update_public_name(public_name, now=self._clock())
         await self._repository.save(organization)

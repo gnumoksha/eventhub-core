@@ -51,9 +51,9 @@ class OrganizationVerificationRejectionReason(RejectionReason):
     pass
 
 
-class OrganizationType(StrEnum):
-    INDIVIDUAL = "INDIVIDUAL"
-    COMPANY = "COMPANY"
+class TaxIDType(StrEnum):
+    CPF = "CPF"
+    CNPJ = "CNPJ"
 
 
 class MemberRole(StrEnum):
@@ -71,9 +71,9 @@ class VerificationStatus(StrEnum):
 
 
 class TaxIdentifier:
-    def __init__(self, value: str, organization_type: OrganizationType) -> None:
+    def __init__(self, value: str, tax_id_type: TaxIDType) -> None:
         value = re.sub(r"[.\-/\s]", "", value).upper()
-        if organization_type is OrganizationType.INDIVIDUAL:
+        if tax_id_type is TaxIDType.CPF:
             if not _valid_cpf(value):
                 raise InvalidValue("Enter a valid CPF")
         elif not _valid_cnpj(value):
@@ -82,11 +82,14 @@ class TaxIdentifier:
 
 
 @dataclass(frozen=True)
-class OrganizationProfile:
-    organization_type: OrganizationType
-    public_name: str
+class OrganizationLegalProfile:
     legal_name: str
     tax_id: str
+    tax_id_type: TaxIDType
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "legal_name", LegalName(self.legal_name).value)
+        object.__setattr__(self, "tax_id", TaxIdentifier(self.tax_id, self.tax_id_type).value)
 
 
 def _valid_cpf(value: str) -> bool:

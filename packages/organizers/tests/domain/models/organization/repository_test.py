@@ -5,7 +5,7 @@ import pytest_asyncio
 from cryptography.fernet import Fernet
 from organizers.domain.models.organization.organization import Organization
 from organizers.domain.models.organization.repository import OrganizationRepository
-from organizers.domain.models.organization.values import OrganizationID, OrganizationProfile, OrganizationType
+from organizers.domain.models.organization.values import OrganizationID, OrganizationLegalProfile, TaxIDType
 from pydantic import SecretStr
 from shared.infra.database import engine
 from shared.infra.outbox import OutboxMessage
@@ -48,16 +48,13 @@ def repository(session: AsyncSession) -> OrganizationRepository:
 
 @pytest.fixture
 def organization() -> Organization:
-    return Organization.create(
-        profile=OrganizationProfile(
-            OrganizationType.INDIVIDUAL,
-            "Event Crew",
-            "Maria da Silva",
-            "52998224725",
-        ),
+    organization = Organization.create(
+        public_name="Event Crew",
         owner_account_id=OrganizationID("018d0e91-3d0b-7000-8000-000000000001"),
         now=NOW,
     )
+    organization.update_legal_profile(OrganizationLegalProfile("Maria da Silva", "52998224725", TaxIDType.CPF), now=NOW)
+    return organization
 
 
 async def test_round_trip_and_ciphertext_storage(

@@ -34,17 +34,21 @@ class PayoutAccountService:
     ) -> PayoutAccount:
         organization = await self._get_owner_organization(organization_id, account_id)
         self._ensure_no_pending_payout_account(organization)
+        tax_id_type = organization.tax_id_type
+        if tax_id_type is None:
+            raise InvalidStateTransition("Complete the legal profile before adding a payout account")
+
         if isinstance(details, PixPayoutDetails):
             payout_account = PayoutAccount.create_pix(
                 organization_id=organization.id,
-                organization_type=organization.organization_type,
+                tax_id_type=tax_id_type,
                 details=details,
                 now=self._clock(),
             )
         else:
             payout_account = PayoutAccount.create_bank_transfer(
                 organization_id=organization.id,
-                organization_type=organization.organization_type,
+                tax_id_type=tax_id_type,
                 details=details,
                 now=self._clock(),
             )
