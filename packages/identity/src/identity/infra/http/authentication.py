@@ -70,7 +70,7 @@ async def require_common_session(auth: FullyAuthenticatedSessionDep) -> CommonAu
 
     return CommonAuthenticatedSession(
         account_id=auth.account.id,
-        organization_id=TEMPORARY_ORGANIZATION_ID,
+        organization_id=TEMPORARY_ORGANIZATION_ID,  # TODO get organization_id
     )
 
 
