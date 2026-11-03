@@ -9,6 +9,7 @@ from shared.infra.app_status.outputs import (
 )
 from shared.infra.database import SessionDep
 from shared.infra.di import Depends
+from shared.infra.i18n import get_locale
 from shared.settings import Settings, SettingsDep
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,7 +30,7 @@ class AppStatusService:
 
         return ShowAppStatusOutput(
             success=overall_success,
-            app=AppOutput(env=self.settings.APP_ENV, version=self.settings.APP_VERSION),
+            app=AppOutput(env=self.settings.APP_ENV, version=self.settings.APP_VERSION, locale=get_locale()),
             services=tested_services or None,
         )
 
