@@ -97,7 +97,7 @@ function show_stats {
         if [ -f "$po_file" ]; then
             lang=$(basename "$(dirname "$(dirname "$po_file")")")
             echo -e "${YELLOW}Language: $lang${NC}"
-            poetry run msgfmt --statistics "$po_file" 2>&1 | grep -v "done"
+            $PREFIX msgfmt --statistics "$po_file" 2>&1 | grep -v "done"
             echo ""
         fi
     done
