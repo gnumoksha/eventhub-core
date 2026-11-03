@@ -27,6 +27,7 @@ from shared.infra.app_status.outputs import ShowAppStatusOutput
 from shared.infra.app_status.services import AppStatusServiceDep
 from shared.infra.authentication.ip import require_private_ip_address
 from shared.infra.di import Depends
+from shared.infra.http.middlewares.i18n import LocaleMiddleware
 from shared.infra.http.middlewares.logger import LogMiddleware
 from shared.infra.logger import logger
 from shared.infra.observability.sentry import initialize_sentry
@@ -68,6 +69,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=("*"),
     allow_headers=("*"),
+)
+app.add_middleware(
+    LocaleMiddleware,
+    supported_locales=settings.LOCALE_SUPPORTED,
+    default_locale=settings.LOCALE_DEFAULT,
 )
 
 

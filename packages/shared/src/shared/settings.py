@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     PUBLIC_FRONTEND_URL: str
     CORS_ALLOWED_ORIGINS: str
     CORS_ALLOW_ORIGIN_REGEX: str | None = None
+    LOCALE_DEFAULT: str = "en"
+    LOCALE_SUPPORTED: list[str] = ["en", "pt_BR"]
 
     RESEND_API_KEY: SecretStr | None = None
     NOTIFICATIONS_FROM_EMAIL: str = "Eventhub <no-reply@example.com>"
