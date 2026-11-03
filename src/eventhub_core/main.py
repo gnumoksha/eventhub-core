@@ -27,6 +27,7 @@ from shared.infra.app_status.outputs import ShowAppStatusOutput
 from shared.infra.app_status.services import AppStatusServiceDep
 from shared.infra.authentication.ip import require_private_ip_address
 from shared.infra.di import Depends
+from shared.infra.http.middlewares.i18n import LocaleMiddleware
 from shared.infra.http.middlewares.logger import LogMiddleware
 from shared.infra.logger import logger
 from shared.infra.observability.sentry import initialize_sentry
@@ -69,28 +70,39 @@ app.add_middleware(
     allow_methods=("*"),
     allow_headers=("*"),
 )
+app.add_middleware(
+    LocaleMiddleware,
+    supported_locales=settings.LOCALE_SUPPORTED,
+    default_locale=settings.LOCALE_DEFAULT,
+)
 
 
 @app.exception_handler(500)
-async def http_exception_handler(request: Request, exc: Exception):  # noqa: ARG001
+async def http_exception_handler(_request: Request, exc: Exception):
     import traceback  # noqa: PLC0415
 
     from fastapi.responses import JSONResponse  # noqa: PLC0415
 
-    msg = "Internal server error"
-
     if settings.is_dev_like():
         msg = str(exc)
-        logger.error(
-            "Error %s %s ",
+        trace = list(traceback.TracebackException.from_exception(exc).format())
+        logger.exception(
+            "Error %s ",
             str(exc),
-            list(traceback.TracebackException.from_exception(exc).format()),
+        )
+
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": msg,
+                "traceback": trace,
+            },
         )
 
     return JSONResponse(
         status_code=500,
         content={
-            "detail": msg,
+            "detail": "Internal server error",
         },
     )
 

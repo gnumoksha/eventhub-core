@@ -24,6 +24,14 @@ class AppOutput(BaseModel):
         ),
     ]
 
+    locale: Annotated[
+        str,
+        Field(
+            description="The application locale based on the HTTP request",
+            examples=["en", "pt_BR"],
+        ),
+    ]
+
 
 class ShowAppStatusOutput(BaseModel):
     """Output for the app status endpoint."""

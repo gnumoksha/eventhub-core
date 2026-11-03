@@ -1,0 +1,82 @@
+# Portuguese (Brazil) translations for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-11-03 16:49-0300\n"
+"PO-Revision-Date: 2026-11-03 16:50-0300\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: pt_BR\n"
+"Language-Team: pt_BR <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: packages/identity/src/identity/infra/http/authentication.py:44
+#: packages/identity/src/identity/infra/http/authentication.py:48
+msgid "Authentication required"
+msgstr "Autenticação necessária"
+
+#: packages/identity/src/identity/infra/http/authentication.py:68
+msgid "Verify your email to access this resource"
+msgstr "Verifique seu e-mail para acessar este recurso"
+
+#: packages/identity/src/identity/infra/http/authentication.py:94
+#: packages/identity/src/identity/infra/http/authentication.py:106
+msgid "Untrusted request origin"
+msgstr "Origem da requisição não confiável"
+
+#: packages/identity/src/identity/infra/http/authentication.py:108
+msgid "Invalid CSRF token"
+msgstr "Token CSRF inválido"
+
+#: packages/identity/src/identity/infra/http/routers/authentication.py:40
+#: packages/identity/src/identity/infra/http/routers/authentication.py:60
+msgid "Enter a valid email address"
+msgstr "Insira um endereço de e-mail válido"
+
+#: packages/identity/src/identity/infra/http/routers/authentication.py:48
+msgid "Enter a valid password"
+msgstr "Insira uma senha válida"
+
+#: packages/identity/src/identity/infra/http/routers/authentication.py:151
+msgid "If the address can be registered, verification instructions will be sent"
+msgstr "Se o endereço puder ser cadastrado, as instruções de verificação serão enviadas"
+
+#: packages/identity/src/identity/infra/http/routers/authentication.py:168
+msgid "Client IP address is required"
+msgstr "O endereço IP do cliente é obrigatório"
+
+#: packages/identity/src/identity/infra/http/routers/authentication.py:182
+msgid "Invalid email or password"
+msgstr "E-mail ou senha inválidos"
+
+#: packages/identity/src/identity/infra/http/routers/authentication.py:224
+msgid "Invalid or expired token"
+msgstr "Token inválido ou expirado"
+
+#: packages/identity/src/identity/infra/http/routers/authentication.py:226
+msgid "Email verified"
+msgstr "E-mail verificado"
+
+#: packages/identity/src/identity/infra/http/routers/authentication.py:237
+msgid "If the account needs verification, an email will be sent"
+msgstr "Se a conta precisar de verificação, um e-mail será enviado"
+
+#: packages/identity/src/identity/infra/http/routers/authentication.py:249
+msgid "If the account exists, a password reset email will be sent"
+msgstr "Se a conta existir, um e-mail de redefinição de senha será enviado"
+
+#: packages/identity/src/identity/infra/http/routers/authentication.py:265
+msgid "Password updated; please log in again"
+msgstr "Senha atualizada; faça login novamente"
+
+#: packages/identity/src/identity/infra/http/routers/authentication.py:282
+msgid "Current password is incorrect"
+msgstr "A senha atual está incorreta"

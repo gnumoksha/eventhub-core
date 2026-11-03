@@ -97,6 +97,13 @@ docker compose exec app-web uv run alembic upgrade head
 
 Always set `APP_ENV=test` when running tests so they use the test database, which is separate from the development database.
 
+### Internationalization (i18n)
+
+1. `./bin/i18n extract`
+2. `./bin/i18n update`
+3. Translate the strings in `locales/**/LC_MESSAGES/messages.po` using a text editor like [poedit](https://poedit.net/).
+4. `./bin/i18n compile`
+
 ## Documentation
 
 - [Architecture and context map](var/docs/bounded_contexts.md)
