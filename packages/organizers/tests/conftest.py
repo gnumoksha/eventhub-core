@@ -11,7 +11,8 @@ from organizers.domain.models.organization.organization import Organization
 from organizers.domain.models.organization.repository import OrganizationRepository
 from organizers.domain.models.organization.values import (
     OrganizationID,
-    OrganizationType,
+    OrganizationLegalProfile,
+    TaxIDType,
     VerificationStatus,
 )
 from organizers.domain.models.payout_account.payout_account import PayoutAccount
@@ -116,14 +117,16 @@ def payout_account_service(
 
 
 @pytest.fixture
-def create_individual(service: OrganizationService, account_id: uuid.UUID):
+def create_organization_with_legal_profile(service: OrganizationService, account_id: uuid.UUID):
     async def create() -> Organization:
-        return await service.create(
+        organization = await service.create(
             owner_account_id=account_id,
-            organization_type=OrganizationType.INDIVIDUAL,
             public_name="Event Crew",
-            legal_name="Maria da Silva",
-            tax_id="529.982.247-25",
+        )
+        return await service.update_profile(
+            organization.id,
+            account_id,
+            legal_profile=OrganizationLegalProfile("Maria da Silva", "529.982.247-25", TaxIDType.CPF),
         )
 
     return create

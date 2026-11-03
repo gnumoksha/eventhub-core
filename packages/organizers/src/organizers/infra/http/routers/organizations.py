@@ -16,7 +16,7 @@ from organizers.application.organization.values import (
 )
 from organizers.application.payout_account.service import PayoutAccountServiceDep
 from organizers.domain.models.organization.organization import Organization
-from organizers.domain.models.organization.values import mask_tax_identifier
+from organizers.domain.models.organization.values import TaxIDType, mask_tax_identifier
 from organizers.domain.models.payout_account.payout_account import PayoutAccount
 
 router = APIRouter(prefix="/organizations", tags=["organizers"])
@@ -29,10 +29,10 @@ class MemberOutput(BaseModel):
 
 class OrganizationOutput(BaseModel):
     id: UUID
-    organization_type: str
+    tax_id_type: TaxIDType | None
     public_name: str
     legal_name: str | None
-    tax_id: str
+    tax_id: str | None
     verification_status: str
     can_sell_paid_tickets: bool
     verification_rejection_reason: str | None
@@ -60,14 +60,18 @@ def _organization_output(
 ) -> OrganizationOutput:
     return OrganizationOutput(
         id=organization.id,
-        organization_type=organization.organization_type,
+        tax_id_type=organization.tax_id_type,
         public_name=organization.public_name,
         legal_name=(
             organization.legal_name
             if organization.has_owner(viewer_account_id)
             else None
         ),
-        tax_id=mask_tax_identifier(organization.tax_id),
+        tax_id=(
+            mask_tax_identifier(organization.tax_id)
+            if organization.tax_id is not None
+            else None
+        ),
         verification_status=organization.verification_status,
         can_sell_paid_tickets=organization.can_sell_paid_tickets,
         verification_rejection_reason=organization.verification_rejection_reason,
@@ -113,10 +117,7 @@ async def create_organization(
 ) -> OrganizationOutput:
     organization = await service.create(
         owner_account_id=session.account_id,
-        organization_type=input_.organization_type,
         public_name=input_.public_name,
-        legal_name=input_.legal_name,
-        tax_id=input_.tax_id,
     )
     return _organization_output(organization, session.account_id)
 
@@ -155,8 +156,7 @@ async def update_organization(
         organization_id,
         session.account_id,
         public_name=input_.public_name,
-        legal_name=input_.legal_name,
-        tax_id=input_.tax_id,
+        legal_profile=input_.to_legal_profile(),
     )
     return _organization_output(organization, session.account_id)
 

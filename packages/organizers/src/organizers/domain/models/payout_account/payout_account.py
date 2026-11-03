@@ -15,8 +15,8 @@ from sqlmodel import Field, SQLModel
 from organizers.domain.models.organization.values import (
     REJECTION_REASON_MAX_LENGTH,
     OrganizationID,
-    OrganizationType,
     TaxIdentifier,
+    TaxIDType,
 )
 from organizers.domain.models.payout_account.events import PayoutAccountVerified
 from organizers.domain.models.payout_account.values import (
@@ -71,11 +71,11 @@ class PayoutAccount(SQLModel, table=True):
         cls,
         *,
         organization_id: OrganizationID,
-        organization_type: OrganizationType,
+        tax_id_type: TaxIDType,
         details: PixPayoutDetails,
         now: datetime,
     ) -> Self:
-        holder_tax_id = TaxIdentifier(details.holder_tax_id, organization_type).value
+        holder_tax_id = TaxIdentifier(details.holder_tax_id, tax_id_type).value
         return cls(
             organization_id=organization_id,
             method=PayoutMethod.PIX,
@@ -93,7 +93,7 @@ class PayoutAccount(SQLModel, table=True):
         cls,
         *,
         organization_id: OrganizationID,
-        organization_type: OrganizationType,
+        tax_id_type: TaxIDType,
         details: BankPayoutDetails,
         now: datetime,
     ) -> Self:
@@ -108,7 +108,7 @@ class PayoutAccount(SQLModel, table=True):
         account_type = details.account_type.strip().upper()
         if account_type not in {"CHECKING", "SAVINGS"}:
             raise InvalidValue("Account type must be CHECKING or SAVINGS")
-        holder_tax_id = TaxIdentifier(details.holder_tax_id, organization_type).value
+        holder_tax_id = TaxIdentifier(details.holder_tax_id, tax_id_type).value
         return cls(
             organization_id=organization_id,
             method=PayoutMethod.BANK_TRANSFER,

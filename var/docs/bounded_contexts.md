@@ -47,6 +47,8 @@ Each context section lists its aggregates, the invariants it owns, and the integ
   - `PayoutAccount`: bank data / PIX key, verified status.
 - **Invariants:**
   - An organization always has at least one owner.
+  - An account can belong to at most one organization; an organization has one or more member accounts.
+  - An organization can be created with only a public name; its legal name, tax ID and tax ID type must be complete before verification is submitted.
   - An organization can sell **paid** tickets only if it is verified and has a verified `PayoutAccount`. Free events have no such requirement.
 - **Publishes:** `OrganizationCreated`, `MemberAdded`, `MemberRemoved`, `OrganizationVerified`, `PayoutAccountVerified`.
 - **Consumes:** `AccountWasDeactivated`.

@@ -12,11 +12,11 @@ from tests.conftest import InMemoryPayoutAccountRepository
 @pytest.mark.asyncio
 async def test_replacement_keeps_current_account_until_new_account_is_approved(
     payout_account_service: PayoutAccountService,
-    create_individual,
+    create_organization_with_legal_profile,
     payout_repository: InMemoryPayoutAccountRepository,
     account_id: uuid.UUID,
 ):
-    organization = await create_individual()
+    organization = await create_organization_with_legal_profile()
     first = await payout_account_service.submit(
         organization.id,
         account_id,
@@ -46,10 +46,10 @@ async def test_replacement_keeps_current_account_until_new_account_is_approved(
 @pytest.mark.asyncio
 async def test_internal_review_queue_lists_only_pending_payout_accounts(
     payout_account_service: PayoutAccountService,
-    create_individual,
+    create_organization_with_legal_profile,
     account_id: uuid.UUID,
 ):
-    organization = await create_individual()
+    organization = await create_organization_with_legal_profile()
     payout_account = await payout_account_service.submit(
         organization.id,
         account_id,
