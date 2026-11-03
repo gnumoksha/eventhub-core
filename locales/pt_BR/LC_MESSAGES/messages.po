@@ -21,62 +21,62 @@ msgstr ""
 #: packages/identity/src/identity/infra/http/authentication.py:44
 #: packages/identity/src/identity/infra/http/authentication.py:48
 msgid "Authentication required"
-msgstr ""
+msgstr "Autenticação necessária"
 
 #: packages/identity/src/identity/infra/http/authentication.py:68
 msgid "Verify your email to access this resource"
-msgstr ""
+msgstr "Verifique seu e-mail para acessar este recurso"
 
 #: packages/identity/src/identity/infra/http/authentication.py:94
 #: packages/identity/src/identity/infra/http/authentication.py:106
 msgid "Untrusted request origin"
-msgstr ""
+msgstr "Origem da requisição não confiável"
 
 #: packages/identity/src/identity/infra/http/authentication.py:108
 msgid "Invalid CSRF token"
-msgstr ""
+msgstr "Token CSRF inválido"
 
 #: packages/identity/src/identity/infra/http/routers/authentication.py:40
 #: packages/identity/src/identity/infra/http/routers/authentication.py:60
 msgid "Enter a valid email address"
-msgstr ""
+msgstr "Insira um endereço de e-mail válido"
 
 #: packages/identity/src/identity/infra/http/routers/authentication.py:48
 msgid "Enter a valid password"
-msgstr ""
+msgstr "Insira uma senha válida"
 
 #: packages/identity/src/identity/infra/http/routers/authentication.py:151
 msgid "If the address can be registered, verification instructions will be sent"
-msgstr ""
+msgstr "Se o endereço puder ser cadastrado, as instruções de verificação serão enviadas"
 
 #: packages/identity/src/identity/infra/http/routers/authentication.py:168
 msgid "Client IP address is required"
-msgstr ""
+msgstr "O endereço IP do cliente é obrigatório"
 
 #: packages/identity/src/identity/infra/http/routers/authentication.py:182
 msgid "Invalid email or password"
-msgstr ""
+msgstr "E-mail ou senha inválidos"
 
 #: packages/identity/src/identity/infra/http/routers/authentication.py:224
 msgid "Invalid or expired token"
-msgstr ""
+msgstr "Token inválido ou expirado"
 
 #: packages/identity/src/identity/infra/http/routers/authentication.py:226
 msgid "Email verified"
-msgstr ""
+msgstr "E-mail verificado"
 
 #: packages/identity/src/identity/infra/http/routers/authentication.py:237
 msgid "If the account needs verification, an email will be sent"
-msgstr ""
+msgstr "Se a conta precisar de verificação, um e-mail será enviado"
 
 #: packages/identity/src/identity/infra/http/routers/authentication.py:249
 msgid "If the account exists, a password reset email will be sent"
-msgstr ""
+msgstr "Se a conta existir, um e-mail de redefinição de senha será enviado"
 
 #: packages/identity/src/identity/infra/http/routers/authentication.py:265
 msgid "Password updated; please log in again"
-msgstr ""
+msgstr "Senha atualizada; faça login novamente"
 
 #: packages/identity/src/identity/infra/http/routers/authentication.py:282
 msgid "Current password is incorrect"
-msgstr ""
+msgstr "A senha atual está incorreta"
