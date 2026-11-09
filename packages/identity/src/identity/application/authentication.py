@@ -8,9 +8,9 @@ from typing import Annotated
 from fastapi.concurrency import run_in_threadpool
 from pwdlib import PasswordHash
 from redis.asyncio import Redis
+from shared.infra.database.memory import RedisDep
 from shared.infra.di import Depends
 from shared.infra.encryption.token import encrypt_authentication_token
-from shared.infra.redis import RedisDep
 
 from identity.domain.models.account.account import (
     Account,

@@ -11,7 +11,7 @@ from organizers.domain.models.payout_account.repository import PayoutAccountRepo
 from organizers.domain.models.payout_account.values import PayoutAccountStatus, PixPayoutDetails
 from pydantic import SecretStr
 from shared.domain.values.financial import Pix, PixKeyType
-from shared.infra.database import engine
+from shared.infra.database.sql import engine
 from shared.infra.outbox import OutboxMessage
 from shared.settings import settings
 from sqlalchemy import text

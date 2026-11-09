@@ -6,6 +6,7 @@ from shared.settings import settings
 to_include = [
     "identity.application.accounts.tasks",
     "events.application.event.tasks",
+    "events.application.event_view.tasks",
 ]
 
 if settings.is_test():

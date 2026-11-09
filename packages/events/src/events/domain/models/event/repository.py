@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated
 
 from shared.domain.errors import ConcurrencyConflict
-from shared.infra.database import SessionDep
+from shared.infra.database.sql import SessionDep
 from shared.infra.di import Depends
 from shared.infra.outbox import add_to_outbox
 from sqlalchemy.ext.asyncio import AsyncSession

@@ -21,7 +21,7 @@ import reporting
 import sales
 import ticketing
 from libs.events import load_events
-from shared.infra.database import SessionDep
+from shared.infra.database.sql import SessionDep
 from shared.infra.di import injectable
 from shared.infra.domain_events import QueueDispatcherDep, close_dispatcher_connection
 from shared.infra.logger import logger
