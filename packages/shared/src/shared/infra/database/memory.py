@@ -16,33 +16,31 @@ class AsyncCache(ABC):
 
     @abstractmethod
     async def set(self, key: str, value: str, expiration: ExpiryT | None = None) -> bool:
-        pass
+        """Set a key-value pair in the cache."""
 
     @abstractmethod
     async def set_complex(self, key: str, value: Any, expiration: ExpiryT | None = None) -> bool:
-        pass
+        """Set a key-value pair in the cache, where the value can be any serializable object."""
 
     @abstractmethod
     async def get(self, key: str) -> str | None:
-        pass
+        """Get the value associated with a key from the cache."""
 
     @abstractmethod
     async def get_complex(self, key: str) -> Any | None:
-        pass
+        """Get the value associated with a key from the cache, where the value can be any serializable object."""
 
     @abstractmethod
     async def delete(self, *keys: str) -> int:
-        pass
+        """Delete one or more keys from the cache."""
 
     @abstractmethod
     async def increment(self, key: str, amount: int = 1) -> int:
         """Atomically increment a counter."""
-        pass
 
     @abstractmethod
     async def expire(self, key: str, expiration: ExpiryT) -> bool:
         """Set a key's expiration."""
-        pass
 
 
 class InMemoryAsyncCache(AsyncCache):
