@@ -122,3 +122,31 @@ async def test_compare_and_delete_only_deletes_matching_token(database: AsyncRed
     assert await database.get("lock") == "current-token"
     assert await database.compare_and_delete("lock", "current-token") is True
     assert await database.get("lock") is None
+
+
+async def test_list_push_appends_to_prefixed_list_and_returns_length(
+    database: AsyncRedisDatabase, redis: Redis, app_env: str
+):
+    assert await database.list_push("queue", "a", "b") == 2
+    assert await database.list_push("queue", "c") == 3
+
+    assert await redis.lrange(f"eventhub_{app_env}_queue", 0, -1) == ["a", "b", "c"]
+
+
+async def test_list_pop_returns_up_to_count_items_from_the_head(database: AsyncRedisDatabase):
+    await database.list_push("queue", "a", "b", "c")
+
+    assert await database.list_pop("queue", count=2) == ["a", "b"]
+    assert await database.list_pop("queue", count=2) == ["c"]
+
+
+async def test_list_pop_returns_empty_list_for_missing_key(database: AsyncRedisDatabase):
+    assert await database.list_pop("missing", count=10) == []
+
+
+async def test_list_length_returns_list_size(database: AsyncRedisDatabase):
+    assert await database.list_length("queue") == 0
+
+    await database.list_push("queue", "a", "b")
+
+    assert await database.list_length("queue") == 2

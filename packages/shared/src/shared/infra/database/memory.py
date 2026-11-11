@@ -19,6 +19,19 @@ class AsyncCache(ABC):
         """Set a key-value pair in the cache."""
 
     @abstractmethod
+    async def set_nx(self, key: str, value: str, *, ex: int) -> bool:
+        """Atomically set a key only if it does not already exist.
+
+        Args:
+            key: The key to set.
+            value: The value to set.
+            ex: Expiration time in seconds (required so the key never lives forever).
+
+        Returns:
+            True if the key was set, False if it already existed.
+        """
+
+    @abstractmethod
     async def set_complex(self, key: str, value: Any, expiration: ExpiryT | None = None) -> bool:
         """Set a key-value pair in the cache, where the value can be any serializable object."""
 
@@ -55,6 +68,13 @@ class InMemoryAsyncCache(AsyncCache):
         return True
 
     @override
+    async def set_nx(self, key: str, value: str, *, ex: int) -> bool:
+        if key in self._cache:
+            return False
+        self._cache[key] = value
+        return True
+
+    @override
     async def set_complex(self, key: str, value: Any, expiration: ExpiryT | None = None) -> bool:
         self._cache[key] = value
         return True
@@ -85,7 +105,23 @@ class InMemoryAsyncCache(AsyncCache):
         raise NotImplementedError("InMemoryAsyncCache does not support key expiration.")
 
 
-class AsyncRedisDatabase(AsyncCache, LockFactory):
+class AsyncList(ABC):
+    """Interface for a shared list (queue) of strings."""
+
+    @abstractmethod
+    async def list_push(self, key: str, *values: str) -> int:
+        """Append values to the tail of a list."""
+
+    @abstractmethod
+    async def list_pop(self, key: str, count: int) -> list[str]:
+        """Remove and return up to ``count`` values from the head of a list."""
+
+    @abstractmethod
+    async def list_length(self, key: str) -> int:
+        """Return the length of a list (0 if the key does not exist)."""
+
+
+class AsyncRedisDatabase(AsyncCache, LockFactory, AsyncList):
     """Cache implementation backed by an asynchronous Redis client."""
 
     def __init__(self, redis: Redis, app_env: str):
@@ -95,6 +131,11 @@ class AsyncRedisDatabase(AsyncCache, LockFactory):
     @override
     async def set(self, key: str, value: str, expiration: ExpiryT | None = None) -> bool:
         result = await self._redis.set(self._build_key(key), value, ex=expiration)
+        return result is not None
+
+    @override
+    async def set_nx(self, key: str, value: str, *, ex: int) -> bool:
+        result = await self._redis.set(self._build_key(key), value, ex=ex, nx=True)
         return result is not None
 
     @override
@@ -168,21 +209,6 @@ class AsyncRedisDatabase(AsyncCache, LockFactory):
             retry_interval_seconds=retry_interval_seconds,
         )
 
-    async def set_nx(self, key: str, value: str, *, ex: int) -> bool:
-        """Set a key only if it does not already exist (atomic lock acquire).
-
-        Args:
-            key: The key to set.
-            value: The value to set.
-            ex: Expiration time in seconds (required to avoid orphaned locks).
-
-        Returns:
-            True if the key was set (lock acquired), False if it already existed.
-        """
-
-        result = await self._redis.set(self._build_key(key), value, ex=ex, nx=True)
-        return result is not None
-
     async def compare_and_delete(self, key: str, expected_value: str) -> bool:
         """Atomically delete a key only if its current value matches.
 
@@ -210,29 +236,57 @@ class AsyncRedisDatabase(AsyncCache, LockFactory):
         deleted = await self._redis.eval(script, 1, self._build_key(key), expected_value)
         return bool(deleted)
 
+    @override
+    async def list_push(self, key: str, *values: str) -> int:
+        """Append values to the tail of a list.
+
+        Returns:
+            The length of the list after the push.
+        """
+        return await self._redis.rpush(self._build_key(key), *values)
+
+    @override
+    async def list_pop(self, key: str, count: int) -> list[str]:
+        """Remove and return up to ``count`` values from the head of a list.
+
+        Returns:
+            The removed values, or an empty list if the list is empty or missing.
+        """
+        values = await self._redis.lpop(self._build_key(key), count)
+        if values is None:
+            return []
+        items = values if isinstance(values, list) else [values]
+        return [item.decode() if isinstance(item, bytes) else str(item) for item in items]
+
+    @override
+    async def list_length(self, key: str) -> int:
+        """Return the length of a list (0 if the key does not exist)."""
+        return await self._redis.llen(self._build_key(key))
+
+    async def aclose(self) -> None:
+        """Close the underlying Redis client."""
+        await self._redis.aclose()
+
     def _build_key(self, key: str) -> str:
         return f"eventhub_{self.__app_env}_{key}"
 
 
 @lru_cache
-def _get_redis(redis_dsn: str) -> Redis:
+def get_redis_client(redis_dsn: str) -> Redis:
+    """Return the process-wide Redis client for ``redis_dsn``.
+
+    Cached because FastAPI resolves dependencies on every request; the cache key
+    is the DSN string because ``Settings`` is not hashable.
+    """
     # decode_responses=True makes Redis return strings instead of bytes.
     return Redis.from_url(redis_dsn, decode_responses=True)
 
 
-def get_redis(settings: SettingsDep) -> Redis:
-    return _get_redis(settings.REDIS_DSN)
-
-
-@lru_cache
-def _get_async_redis_database(redis_dsn: str, app_env: str) -> AsyncRedisDatabase:
-    return AsyncRedisDatabase(_get_redis(redis_dsn), app_env=app_env)
-
-
 def get_async_redis_database(settings: SettingsDep) -> AsyncRedisDatabase:
-    return _get_async_redis_database(settings.REDIS_DSN, settings.APP_ENV)
+    return AsyncRedisDatabase(get_redis_client(settings.REDIS_DSN), app_env=settings.APP_ENV)
 
 
-RedisDep = Annotated[Redis, Depends(get_redis)]
+AsyncRedisDatabaseDep = Annotated[AsyncRedisDatabase, Depends(get_async_redis_database)]
 AsyncCacheDep = Annotated[AsyncCache, Depends(get_async_redis_database)]
-LockDep = Annotated[LockFactory, Depends(get_async_redis_database)]
+LockFactoryDep = Annotated[LockFactory, Depends(get_async_redis_database)]
+AsyncListDep = Annotated[AsyncList, Depends(get_async_redis_database)]

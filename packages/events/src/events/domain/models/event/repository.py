@@ -20,6 +20,10 @@ class EventRepository:
     async def get(self, id: EventID) -> Event | None:
         return await self._session.get(Event, id)
 
+    async def find_ids_by_ids(self, event_ids: set[EventID]) -> set[EventID]:
+        existing_events_res = await self._session.execute(select(Event.id).where(col(Event.id).in_(event_ids)))
+        return set(existing_events_res.scalars().all())
+
     async def save(self, event: Event) -> None:
         """
         Inserts or updates the event and, in the same transaction, stores its

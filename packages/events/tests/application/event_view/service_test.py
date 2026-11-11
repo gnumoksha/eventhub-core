@@ -13,17 +13,18 @@ from events.domain.models.event_view.values import (
     DailyViews,
     EventViewsMetrics,
 )
+from shared.infra.database.memory import AsyncCache, AsyncList
 
 
 @pytest.mark.asyncio
 async def test_record_view_new_visitor_enqueues_and_schedules_flush():
     repository = AsyncMock()
-    redis = AsyncMock()
-    # is_new = True
-    redis.set.side_effect = ["1", "1"]  # seen_key success, schedule flush success
-    redis.rpush.return_value = 1  # 1 item in queue
+    cache = AsyncMock(spec=AsyncCache)
+    distributed_list = AsyncMock(spec=AsyncList)
+    cache.set_nx.side_effect = [True, True]  # seen_key success, schedule flush success
+    distributed_list.list_push.return_value = 1  # 1 item in queue
 
-    service = EventViewService(repository, redis)
+    service = EventViewService(repository, cache, distributed_list)
     event_id = uuid.uuid4()
 
     with patch("events.application.event_view.service.flush_views_buffer.apply_async") as mock_apply_async:
@@ -35,16 +36,15 @@ async def test_record_view_new_visitor_enqueues_and_schedules_flush():
         )
 
         assert recorded is True
-        assert redis.set.call_count == 2
+        assert cache.set_nx.call_count == 2
         # Check deduplication call
-        first_call = redis.set.call_args_list[0]
+        first_call = cache.set_nx.call_args_list[0]
         assert first_call[0][0].startswith(f"views:seen:{event_id}:")
         assert first_call[1]["ex"] == DEDUPLICATION_TTL_SECONDS
-        assert first_call[1]["nx"] is True
 
         # Check queue push
-        assert redis.rpush.call_count == 1
-        assert redis.rpush.call_args[0][0] == "events:views:pending"
+        assert distributed_list.list_push.call_count == 1
+        assert distributed_list.list_push.call_args[0][0] == "events:views:pending"
 
         # Check flush scheduled with countdown
         mock_apply_async.assert_called_once_with(countdown=COUNTDOWN_SECONDS)
@@ -53,11 +53,11 @@ async def test_record_view_new_visitor_enqueues_and_schedules_flush():
 @pytest.mark.asyncio
 async def test_record_view_duplicate_visitor_is_ignored():
     repository = AsyncMock()
-    redis = AsyncMock()
-    # is_new = None (key already existed in Redis)
-    redis.set.return_value = None
+    cache = AsyncMock(spec=AsyncCache)
+    distributed_list = AsyncMock(spec=AsyncList)
+    cache.set_nx.return_value = False  # key already existed
 
-    service = EventViewService(repository, redis)
+    service = EventViewService(repository, cache, distributed_list)
     event_id = uuid.uuid4()
 
     recorded = await service.record_view(
@@ -67,17 +67,18 @@ async def test_record_view_duplicate_visitor_is_ignored():
     )
 
     assert recorded is False
-    redis.rpush.assert_not_called()
+    distributed_list.list_push.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_record_view_triggers_immediate_flush_when_threshold_reached():
     repository = AsyncMock()
-    redis = AsyncMock()
-    redis.set.return_value = "1"
-    redis.rpush.return_value = BUFFER_THRESHOLD  # 100 items
+    cache = AsyncMock(spec=AsyncCache)
+    distributed_list = AsyncMock(spec=AsyncList)
+    cache.set_nx.return_value = True
+    distributed_list.list_push.return_value = BUFFER_THRESHOLD  # 100 items
 
-    service = EventViewService(repository, redis)
+    service = EventViewService(repository, cache, distributed_list)
     event_id = uuid.uuid4()
 
     with patch("events.application.event_view.service.flush_views_buffer.delay") as mock_delay:
@@ -94,7 +95,8 @@ async def test_record_view_triggers_immediate_flush_when_threshold_reached():
 @pytest.mark.asyncio
 async def test_get_event_metrics_uses_cache():
     repository = AsyncMock()
-    redis = AsyncMock()
+    cache = AsyncMock(spec=AsyncCache)
+    distributed_list = AsyncMock(spec=AsyncList)
     event_id = uuid.uuid4()
 
     cached_metrics = EventViewsMetrics(
@@ -109,9 +111,9 @@ async def test_get_event_metrics_uses_cache():
             )
         ],
     )
-    redis.get.return_value = cached_metrics.model_dump_json()
+    cache.get.return_value = cached_metrics.model_dump_json()
 
-    service = EventViewService(repository, redis)
+    service = EventViewService(repository, cache, distributed_list)
     result = await service.get_event_metrics(event_id)
 
     assert result == cached_metrics
@@ -121,10 +123,11 @@ async def test_get_event_metrics_uses_cache():
 @pytest.mark.asyncio
 async def test_get_event_metrics_queries_repository_and_populates_cache():
     repository = AsyncMock()
-    redis = AsyncMock()
+    cache = AsyncMock(spec=AsyncCache)
+    distributed_list = AsyncMock(spec=AsyncList)
     event_id = uuid.uuid4()
 
-    redis.get.return_value = None  # Cache miss
+    cache.get.return_value = None  # Cache miss
 
     db_metrics = EventViewsMetrics(
         event_id=event_id,
@@ -134,13 +137,13 @@ async def test_get_event_metrics_queries_repository_and_populates_cache():
     )
     repository.get_metrics.return_value = db_metrics
 
-    service = EventViewService(repository, redis)
+    service = EventViewService(repository, cache, distributed_list)
     result = await service.get_event_metrics(event_id)
 
     assert result == db_metrics
     repository.get_metrics.assert_called_once_with(event_id, days=30)
-    redis.set.assert_called_once_with(
+    cache.set.assert_called_once_with(
         f"events:views:metrics:{event_id}:30",
         db_metrics.model_dump_json(),
-        ex=300,
+        expiration=300,
     )

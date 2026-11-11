@@ -16,6 +16,7 @@ from events.domain.models.event_view.repository import (
     EventViewRepository,
 )
 from redis.asyncio import Redis
+from shared.infra.database.memory import AsyncRedisDatabase
 from shared.infra.database.sql import engine
 from shared.settings import settings
 from sqlalchemy.ext.asyncio import (
@@ -66,7 +67,8 @@ async def test_async_flush_processes_valid_events_and_discards_invalid(
     invalid_event_id = uuid.uuid4()
 
     # 2. Setup Redis with items in buffer
-    redis = Redis.from_url(settings.REDIS_DSN, decode_responses=True)
+    client = Redis.from_url(settings.REDIS_DSN, decode_responses=True)
+    redis = AsyncRedisDatabase(client, app_env=settings.APP_ENV)
     await redis.delete(BUFFER_QUEUE_KEY, FLUSH_SCHEDULED_KEY)
 
     valid_payload = json.dumps(
@@ -84,7 +86,7 @@ async def test_async_flush_processes_valid_events_and_discards_invalid(
         }
     )
 
-    await redis.rpush(BUFFER_QUEUE_KEY, valid_payload, invalid_payload)
+    await redis.list_push(BUFFER_QUEUE_KEY, valid_payload, invalid_payload)
     await redis.set(FLUSH_SCHEDULED_KEY, "1")
 
     test_factory = async_sessionmaker(
@@ -102,7 +104,7 @@ async def test_async_flush_processes_valid_events_and_discards_invalid(
             flushed_count = await _async_flush(batch_size=10)
 
         assert flushed_count == 1  # Only the valid event
-        assert await redis.llen(BUFFER_QUEUE_KEY) == 0
+        assert await redis.list_length(BUFFER_QUEUE_KEY) == 0
         assert await redis.get(FLUSH_SCHEDULED_KEY) is None
 
         # Check DB
@@ -111,4 +113,4 @@ async def test_async_flush_processes_valid_events_and_discards_invalid(
         assert metrics.unique_visitors == 1
     finally:
         await redis.delete(BUFFER_QUEUE_KEY, FLUSH_SCHEDULED_KEY)
-        await redis.aclose()
+        await client.aclose()
