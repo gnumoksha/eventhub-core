@@ -111,6 +111,29 @@ def test_get_views_authorized_returns_200(
     assert len(data["daily_views"]) == 1
 
 
+def test_get_views_with_days_param(
+    client: TestClient,
+    mock_event_service: AsyncMock,
+    mock_view_service: AsyncMock,
+):
+    event = make_draft()
+    event.organization_id = ORG_A
+    mock_event_service.get.return_value = event
+
+    metrics = EventViewsMetrics(
+        event_id=event.id,
+        total_views=10,
+        unique_visitors=8,
+        daily_views=[],
+    )
+    mock_view_service.get_event_metrics.return_value = metrics
+
+    response = client.get(f"/events/{event.id}/views?days=14")
+
+    assert response.status_code == 200
+    mock_view_service.get_event_metrics.assert_called_once_with(event.id, days=14)
+
+
 def test_get_views_unauthorized_org_returns_403(
     client: TestClient,
     mock_event_service: AsyncMock,

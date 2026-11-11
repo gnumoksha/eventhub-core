@@ -10,6 +10,7 @@ from events.application.event_view.tasks import (
     BUFFER_QUEUE_KEY,
     FLUSH_SCHEDULED_KEY,
     _async_flush,
+    flush_views_buffer,
 )
 from events.domain.models.event.repository import EventRepository
 from events.domain.models.event_view.repository import (
@@ -22,7 +23,6 @@ from shared.settings import settings
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncSession,
-    async_sessionmaker,
 )
 
 from tests.conftest import make_draft
@@ -53,8 +53,7 @@ async def session(connection: AsyncConnection) -> AsyncIterator[AsyncSession]:
         yield session
 
 
-async def test_async_flush_processes_valid_events_and_discards_invalid(
-    connection: AsyncConnection,
+async def test_async_flush_processes_valid_events_and_discards_invalid_and_malformed(
     session: AsyncSession,
 ):
     event_repo = EventRepository(session)
@@ -85,23 +84,32 @@ async def test_async_flush_processes_valid_events_and_discards_invalid(
             "viewed_at": datetime.now(UTC).isoformat(),
         }
     )
+    malformed_uuid_payload = json.dumps(
+        {
+            "event_id": "not-a-valid-uuid",
+            "visitor_hash": "hash_3",
+            "viewed_at": datetime.now(UTC).isoformat(),
+        }
+    )
+    malformed_json = "{bad-json"
 
-    await redis.list_push(BUFFER_QUEUE_KEY, valid_payload, invalid_payload)
+    await redis.list_push(
+        BUFFER_QUEUE_KEY,
+        valid_payload,
+        invalid_payload,
+        malformed_uuid_payload,
+        malformed_json,
+    )
     await redis.set(FLUSH_SCHEDULED_KEY, "1")
 
-    test_factory = async_sessionmaker(
-        bind=connection,
-        join_transaction_mode="create_savepoint",
-        expire_on_commit=False,
-    )
-
     try:
-        # 3. Run flush within test connection transaction
-        with patch(
-            "events.application.event_view.tasks.SessionFactory",
-            test_factory,
-        ):
-            flushed_count = await _async_flush(batch_size=10)
+        # 3. Run flush passing dependencies
+        flushed_count = await _async_flush(
+            redis=redis,
+            event_repo=event_repo,
+            event_view_repo=view_repo,
+            batch_size=10,
+        )
 
         assert flushed_count == 1  # Only the valid event
         assert await redis.list_length(BUFFER_QUEUE_KEY) == 0
@@ -114,3 +122,18 @@ async def test_async_flush_processes_valid_events_and_discards_invalid(
     finally:
         await redis.delete(BUFFER_QUEUE_KEY, FLUSH_SCHEDULED_KEY)
         await client.aclose()
+
+
+async def test_flush_views_buffer_task_delegates_to_async_flush():
+    def _fake_run(coro):
+        coro.close()
+        return 42
+
+    with patch(
+        "events.application.event_view.tasks.run_coroutine",
+        side_effect=_fake_run,
+    ) as mock_run_coroutine:
+        result = flush_views_buffer(batch_size=25)
+
+        assert result == 42
+        mock_run_coroutine.assert_called_once()

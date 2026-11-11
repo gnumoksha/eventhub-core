@@ -263,10 +263,6 @@ class AsyncRedisDatabase(AsyncCache, LockFactory, AsyncList):
         """Return the length of a list (0 if the key does not exist)."""
         return await self._redis.llen(self._build_key(key))
 
-    async def aclose(self) -> None:
-        """Close the underlying Redis client."""
-        await self._redis.aclose()
-
     def _build_key(self, key: str) -> str:
         return f"eventhub_{self.__app_env}_{key}"
 
