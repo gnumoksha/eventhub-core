@@ -7,10 +7,9 @@ from typing import Annotated
 
 from fastapi.concurrency import run_in_threadpool
 from pwdlib import PasswordHash
-from redis.asyncio import Redis
+from shared.infra.database.memory import AsyncCache, AsyncCacheDep
 from shared.infra.di import Depends
 from shared.infra.encryption.token import encrypt_authentication_token
-from shared.infra.redis import RedisDep
 
 from identity.domain.models.account.account import (
     Account,
@@ -56,8 +55,8 @@ def _new_token() -> str:
 
 
 class LoginThrottle:
-    def __init__(self, redis: Redis) -> None:
-        self._redis = redis
+    def __init__(self, cache: AsyncCache) -> None:
+        self._cache = cache
 
     @staticmethod
     def _key(email: Email, client_ip: str) -> str:
@@ -65,26 +64,27 @@ class LoginThrottle:
         return f"identity:login:{hashlib.sha256(key_material).hexdigest()}"
 
     async def check(self, email: Email, client_ip: str) -> None:
-        if await self._redis.ttl(f"{self._key(email, client_ip)}:blocked") > 0:
+        if await self._cache.get(f"{self._key(email, client_ip)}:blocked") is not None:
             raise AuthenticationError
 
     async def failed(self, email: Email, client_ip: str) -> None:
         key = self._key(email, client_ip)
-        failures = await self._redis.incrby(f"{key}:failures")
+        failures_key = f"{key}:failures"
+        failures = await self._cache.increment(failures_key)
         if failures == 1:
-            await self._redis.expire(f"{key}:failures", LOGIN_WINDOW_SECONDS)
+            await self._cache.expire(failures_key, LOGIN_WINDOW_SECONDS)
         if failures >= LOGIN_FAILURE_LIMIT:
-            await self._redis.set(f"{key}:blocked", "1", ex=LOGIN_BACKOFF_SECONDS)
+            await self._cache.set(f"{key}:blocked", "1", expiration=LOGIN_BACKOFF_SECONDS)
 
     async def succeeded(self, email: Email, client_ip: str) -> None:
         key = self._key(email, client_ip)
-        await self._redis.delete(f"{key}:failures", f"{key}:blocked")
+        await self._cache.delete(f"{key}:failures", f"{key}:blocked")
 
 
 class IdentityService:
-    def __init__(self, repository: AccountRepository, redis: Redis) -> None:
+    def __init__(self, repository: AccountRepository, cache: AsyncCache) -> None:
         self._repository = repository
-        self._throttle = LoginThrottle(redis)
+        self._throttle = LoginThrottle(cache)
 
     async def signup(
         self,
@@ -300,8 +300,8 @@ class IdentityService:
         )
 
 
-def get_identity_service(repository: AccountRepositoryDep, redis: RedisDep) -> IdentityService:
-    return IdentityService(repository, redis)
+def get_identity_service(repository: AccountRepositoryDep, cache: AsyncCacheDep) -> IdentityService:
+    return IdentityService(repository, cache)
 
 
 IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]

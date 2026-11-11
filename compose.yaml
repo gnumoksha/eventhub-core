@@ -83,6 +83,25 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  tasks-consumer:
+    image: eventhub/core-web:latest
+    # command: [ "celery", "-A", "src.application.invoices.tasks.app", "worker", "--loglevel=info" ]
+    command: [ "celery", "-A", "shared.infra.tasks.app", "worker", "--loglevel=info" ]
+    user: root
+    volumes:
+      - .:/app
+      - /app/.venv
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    develop:
+      watch:
+        - path: ./packages/shared/src/shared/infra/tasks.py
+          target: /app/packages/shared/src/shared/infra/tasks.py
+          action: sync+restart
+
   postgresql:
     image: postgres:18
     ports:
@@ -120,6 +139,11 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: eventhub
       RABBITMQ_DEFAULT_PASS: eventhub
+    volumes:
+      # To avoid the following error:
+      # https://stackoverflow.com/a/79946538
+      # operation queue.declare caused a connection exception internal_error: "Feature `transient_nonexcl_queues` is deprecated
+      - ./var/docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     healthcheck:
       test: rabbitmq-diagnostics check_port_connectivity
       interval: 10s

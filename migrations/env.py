@@ -2,6 +2,7 @@ from logging.config import fileConfig
 
 import alembic_postgresql_enum  # detects changes in the values of PostgreSQL enums
 import events.domain.models.event.event  # register the tables in the metadata
+import events.domain.models.event_view.event_view  # register the tables in the metadata
 import identity.domain.models.account.account  # register the tables in the metadata
 import organizers.domain.models.organization.organization  # register the tables in the metadata
 import organizers.domain.models.payout_account.payout_account  # register the tables in the metadata

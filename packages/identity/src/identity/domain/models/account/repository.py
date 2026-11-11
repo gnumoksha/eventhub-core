@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Annotated
 
 from libs.events import PublishableEvent
-from shared.infra.database import SessionDep
+from shared.infra.database.sql import SessionDep
 from shared.infra.di import Depends
 from shared.infra.outbox import add_to_outbox
 from sqlalchemy.exc import IntegrityError

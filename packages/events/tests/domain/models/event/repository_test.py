@@ -7,7 +7,7 @@ from events.domain.models.event.event import Event
 from events.domain.models.event.repository import EventRepository
 from events.domain.models.event.values import EventStatus, EventUpdate, OnlineVenue
 from shared.domain.errors import ConcurrencyConflict
-from shared.infra.database import engine
+from shared.infra.database.sql import engine
 from shared.infra.outbox import OutboxMessage
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlmodel import col, select

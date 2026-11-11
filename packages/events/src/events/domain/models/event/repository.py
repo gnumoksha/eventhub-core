@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated
 
 from shared.domain.errors import ConcurrencyConflict
-from shared.infra.database import SessionDep
+from shared.infra.database.sql import SessionDep
 from shared.infra.di import Depends
 from shared.infra.outbox import add_to_outbox
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,10 @@ class EventRepository:
 
     async def get(self, id: EventID) -> Event | None:
         return await self._session.get(Event, id)
+
+    async def find_ids_by_ids(self, event_ids: set[EventID]) -> set[EventID]:
+        existing_events_res = await self._session.execute(select(Event.id).where(col(Event.id).in_(event_ids)))
+        return set(existing_events_res.scalars().all())
 
     async def save(self, event: Event) -> None:
         """

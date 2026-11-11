@@ -1,6 +1,6 @@
 from .dispatcher import Dispatcher, EventDispatchError, LocalDispatcher, RecordingDispatcher
 from .encoding import EventDecodeError, JsonDecoder, JsonEncoder, UnmappedEventError
-from .event import Metadata, PublishableEvent, SerializableDict
+from .event import EventID, Metadata, PublishableEvent, SerializableDict
 from .listener import Listener, listened_event_names, listener
 from .loader import load_events, load_listeners
 from .rabbitmq import (
@@ -11,6 +11,7 @@ from .rabbitmq import (
 
 __all__ = [
     "PublishableEvent",
+    "EventID",
     "Metadata",
     "SerializableDict",
     "JsonEncoder",

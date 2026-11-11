@@ -4,7 +4,7 @@ from typing import Self, override
 import pytest
 import pytest_asyncio
 from libs.events import EventDispatchError, Metadata, PublishableEvent, RecordingDispatcher, SerializableDict
-from shared.infra.database import engine
+from shared.infra.database.sql import engine
 from shared.infra.outbox import OutboxMessage, OutboxRelay, add_to_outbox
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession

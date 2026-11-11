@@ -43,7 +43,7 @@ Read `var/docs/bounded_contexts.md` before designing anything: it is the domain 
 
 ### Aggregate pattern (see `events/domain/models/event/`)
 
-- The aggregate is a SQLModel `table=True` class. Domain entity and persistence model are the **same class**. State changes go only through its methods, which validate explicitly (table models skip Pydantic validation) and take `now: datetime` instead of reading the clock.
+- The aggregate is a SQLModel `table=True` class. Domain entity and persistence model are the **same class**. State changes go only through its methods, which validate explicitly (table models skip Pydantic validation).
 - Optimistic locking via a `version` column (`version_id_col`); the repository turns `StaleDataError` into `shared.domain.errors.ConcurrencyConflict`.
 - Methods record integration events (`PublishableEvent` subclasses in `events.py`, named `eventhub.<context>.<aggregate>.<verb>` (lowercase words separated by dots: the name is the RabbitMQ routing key), with explicit `to_dict`/`from_dict`). The repository's `save()` calls `add_to_outbox(session, aggregate.pull_events())` before committing, so state and events are atomic. Delivery is at-least-once, so listeners must be idempotent.
 - `values.py` holds value objects and id aliases (e.g. `OrganizationID = uuid.UUID`).

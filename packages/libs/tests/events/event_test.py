@@ -4,6 +4,7 @@ from typing import Self, override
 
 import pytest
 from libs.events.event import Metadata, PublishableEvent, SerializableDict
+from libs.events.values import EventID
 
 
 class SampleEvent(PublishableEvent, name="test.sample_event"):
@@ -27,7 +28,7 @@ class TestMetadata:
         meta = Metadata()
         after = datetime.now(UTC)
 
-        assert isinstance(meta.id, uuid.UUID)
+        assert isinstance(meta.id, EventID)
         assert meta.id.version == 7
         assert before <= meta.occurred_on <= after
 
@@ -115,7 +116,7 @@ class TestPublishableEvent:
     def test_event_default_and_custom_metadata(self):
         event = SampleEvent("hello")
         assert event.metadata is not None
-        assert isinstance(event.metadata.id, uuid.UUID)
+        assert isinstance(event.metadata.id, EventID)
 
         custom_meta = Metadata(schema_version="3.0.0")
         event_with_custom = SampleEvent("world", metadata=custom_meta)

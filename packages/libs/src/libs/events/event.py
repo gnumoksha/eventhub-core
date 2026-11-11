@@ -1,10 +1,11 @@
 import re
-import uuid
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import Self
 
 import uuid_utils.compat as uuid_compat
+
+from .values import EventID
 
 SerializableDict = dict[str, str | int | float | bool | None]
 
@@ -13,7 +14,7 @@ class Metadata:
     def __init__(
         self,
         schema_version: str = "1.0.0",
-        id: uuid.UUID | None = None,
+        id: EventID | None = None,
         occurred_on: datetime | None = None,
     ) -> None:
         self._schema_version = schema_version
@@ -24,7 +25,7 @@ class Metadata:
         self._occurred_on = occurred_on.astimezone(UTC)
 
     @property
-    def id(self) -> uuid.UUID:
+    def id(self) -> EventID:
         """
         Returns the event's ID.
 
@@ -57,7 +58,7 @@ class Metadata:
         """
         return cls(
             str(metadata["schema_version"]),
-            uuid.UUID(str(metadata["id"])),
+            EventID(str(metadata["id"])),
             datetime.fromisoformat(str(metadata["occurred_on"])),
         )
 

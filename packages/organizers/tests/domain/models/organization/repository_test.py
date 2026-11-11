@@ -7,7 +7,7 @@ from organizers.domain.models.organization.organization import Organization
 from organizers.domain.models.organization.repository import OrganizationRepository
 from organizers.domain.models.organization.values import OrganizationID, OrganizationLegalProfile, TaxIDType
 from pydantic import SecretStr
-from shared.infra.database import engine
+from shared.infra.database.sql import engine
 from shared.infra.outbox import OutboxMessage
 from shared.settings import settings
 from sqlalchemy import text
