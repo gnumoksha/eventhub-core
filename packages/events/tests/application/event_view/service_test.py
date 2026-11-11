@@ -8,6 +8,7 @@ from events.application.event_view.service import (
     COUNTDOWN_SECONDS,
     DEDUPLICATION_TTL_SECONDS,
     EventViewService,
+    compute_visitor_hash,
 )
 from events.domain.models.event_view.values import (
     DailyViews,
@@ -147,3 +148,29 @@ async def test_get_event_metrics_queries_repository_and_populates_cache():
         db_metrics.model_dump_json(),
         expiration=300,
     )
+
+
+def test_compute_visitor_hash_prefers_session_token():
+    hash_session = compute_visitor_hash("10.0.0.1", "Mozilla", session_token="user-session-123")  # noqa: S106
+    hash_session_different_ip = compute_visitor_hash("192.168.1.1", "Safari", session_token="user-session-123")  # noqa: S106
+
+    # Identical session token produces identical hash regardless of IP/User-Agent
+    assert hash_session == hash_session_different_ip
+
+
+def test_compute_visitor_hash_falls_back_to_ip_and_user_agent():
+    hash_network = compute_visitor_hash("10.0.0.1", "Mozilla", session_token=None)
+    hash_network_same = compute_visitor_hash("10.0.0.1", "Mozilla", session_token=None)
+    hash_network_diff = compute_visitor_hash("10.0.0.2", "Mozilla", session_token=None)
+
+    assert hash_network == hash_network_same
+    assert hash_network != hash_network_diff
+
+
+def test_compute_visitor_hash_generates_distinct_for_headerless():
+    h1 = compute_visitor_hash(None, None, None)
+    h2 = compute_visitor_hash(None, None, None)
+
+    assert h1 != h2
+    assert len(h1) == 64
+    assert len(h2) == 64

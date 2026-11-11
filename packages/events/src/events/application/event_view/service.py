@@ -1,5 +1,6 @@
 import hashlib
 import json
+import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -21,6 +22,7 @@ from shared.infra.database.memory import (
     AsyncListDep,
 )
 from shared.infra.di import Depends
+from shared.infra.logger import logger
 
 CACHE_TTL_SECONDS = 300  # 5 minutes
 DEDUPLICATION_TTL_SECONDS = 3600  # 1 hour
@@ -33,7 +35,13 @@ def compute_visitor_hash(
     user_agent: str | None,
     session_token: str | None = None,
 ) -> str:
-    raw = f"{client_ip or ''}|{user_agent or ''}|{session_token or ''}"
+    if session_token and session_token.strip():
+        raw = f"session:{session_token.strip()}"
+    elif client_ip or user_agent:
+        raw = f"network:{client_ip or ''}|{user_agent or ''}"
+    else:
+        logger.error("Insufficient information for visitor hash computation.")
+        raw = f"anonymous:{uuid.uuid4()}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
