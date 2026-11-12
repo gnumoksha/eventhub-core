@@ -7,6 +7,7 @@ from shared.infra.logger import logger
 from events.application.event.image import EventBannerUpload, EventImageServiceDep, EventImageStorage
 from events.domain.models.event.event import Event
 from events.domain.models.event.repository import EventRepository, EventRepositoryDep
+from events.domain.models.event.slug import Slug
 from events.domain.models.event.values import (
     AgeRating,
     EventID,
@@ -48,9 +49,12 @@ class EventService:
         period: EventPeriod | None = None,
         banner: EventBannerUpload | None = None,
     ) -> Event:
+        base_slug = Slug.from_title(title).value
+        slug = await self._repository.find_available_slug(base_slug)
         event = Event.create(
             organization_id=organization_id,
             title=title,
+            slug=slug,
             description=description,
             age_rating=age_rating,
             venue=venue,
@@ -108,9 +112,9 @@ class EventService:
         organization_id: OrganizationID,
         *,
         status: EventStatus | None = None,
-        limit: int = 50,
+        limit: int = 10,
         offset: int = 0,
-    ) -> list[Event]:
+    ) -> tuple[list[Event], int]:
         return await self._repository.list_by_organization(
             organization_id,
             status=status,
@@ -118,10 +122,27 @@ class EventService:
             offset=offset,
         )
 
+    async def list_public(
+        self,
+        *,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> tuple[list[Event], int]:
+        return await self._repository.list_public(
+            self._clock(),
+            limit=limit,
+            offset=offset,
+        )
+
     async def update(self, event_id: EventID, event_update: EventUpdate) -> Event:
         event = await self.get(event_id)
 
-        event.update(event_update, now=self._clock())
+        new_slug = None
+        if event.should_update_slug(event_update.title):
+            base_slug = Slug.from_title(event_update.title).value
+            new_slug = await self._repository.find_available_slug(base_slug, exclude_event_id=event.id)
+
+        event.update(event_update, now=self._clock(), new_slug=new_slug)
 
         await self._repository.save(event)
         return event

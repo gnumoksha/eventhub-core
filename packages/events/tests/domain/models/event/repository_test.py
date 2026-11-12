@@ -5,7 +5,8 @@ import pytest
 import pytest_asyncio
 from events.domain.models.event.event import Event
 from events.domain.models.event.repository import EventRepository
-from events.domain.models.event.values import EventStatus, EventUpdate, OnlineVenue
+from events.domain.models.event.values import EventPeriod, EventStatus, EventUpdate, OnlineVenue
+from events.domain.models.event_view.event_view import EventView
 from shared.domain.errors import ConcurrencyConflict
 from shared.infra.database.sql import engine
 from shared.infra.outbox import OutboxMessage
@@ -184,3 +185,85 @@ async def test_concurrency_conflict_does_not_store_integration_events(
         "eventhub.events.event.published",
         "eventhub.events.event.cancelled",
     ]
+
+
+async def test_find_available_slug(repository: EventRepository):
+    # When no slug exists
+    slug1 = await repository.find_available_slug("festival")
+    assert slug1 == "festival"
+
+    ev1 = make_draft()
+    ev1.slug = "festival"
+    await repository.save(ev1)
+
+    # When "festival" exists
+    slug2 = await repository.find_available_slug("festival")
+    assert slug2 == "festival-2"
+
+    ev2 = make_draft()
+    ev2.slug = "festival-2"
+    await repository.save(ev2)
+
+    # When "festival" and "festival-2" exist
+    slug3 = await repository.find_available_slug("festival")
+    assert slug3 == "festival-3"
+
+    # Excluding own event id
+    own_slug = await repository.find_available_slug("festival", exclude_event_id=ev1.id)
+    assert own_slug == "festival"
+
+    # Does not jump suffix if an existing slug ends in a number/year (e.g. concert-2026)
+    ev_year = make_draft()
+    ev_year.slug = "concert-2026"
+    await repository.save(ev_year)
+
+    ev_concert = make_draft()
+    ev_concert.slug = "concert"
+    await repository.save(ev_concert)
+
+    next_concert = await repository.find_available_slug("concert")
+    assert next_concert == "concert-2"
+
+
+async def test_list_public(repository: EventRepository, session: AsyncSession):
+    # Event 1: published, starts in 20 days, has 2 views
+    ev1 = make_draft()
+    ev1.title = "Festival Pop"
+    ev1.slug = "festival-pop"
+    ev1.publish(NOW)
+    await repository.save(ev1)
+
+    v1 = EventView.record(event_id=ev1.id, visitor_hash="hash1")
+    v2 = EventView.record(event_id=ev1.id, visitor_hash="hash2")
+    session.add_all([v1, v2])
+
+    # Event 2: published, starts in 5 days, has 0 views
+    ev2 = make_draft()
+    ev2.title = "Jazz Night"
+    ev2.slug = "jazz-night"
+    ev2.schedule(EventPeriod(start_at=NOW + timedelta(days=5), end_at=NOW + timedelta(days=5, hours=3)), NOW)
+    ev2.publish(NOW)
+    await repository.save(ev2)
+
+    # Event 3: published, starts in 15 days, has 0 views
+    ev3 = make_draft()
+    ev3.title = "Indie Fest"
+    ev3.slug = "indie-fest"
+    ev3.schedule(EventPeriod(start_at=NOW + timedelta(days=15), end_at=NOW + timedelta(days=15, hours=3)), NOW)
+    ev3.publish(NOW)
+    await repository.save(ev3)
+
+    # Event 4: draft (should be excluded)
+    ev4 = make_draft()
+    ev4.slug = "draft-event"
+    await repository.save(ev4)
+
+    await session.commit()
+
+    events, total = await repository.list_public(NOW, limit=10, offset=0)
+    assert total == 3
+    assert len(events) == 3
+    # ev1 has 2 views -> 1st
+    # ev2 has 0 views and starts in 5 days -> 2nd
+    # ev3 has 0 views and starts in 15 days -> 3rd
+    assert [e.id for e in events] == [ev1.id, ev2.id, ev3.id]

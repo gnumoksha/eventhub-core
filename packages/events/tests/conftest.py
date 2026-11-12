@@ -7,6 +7,7 @@ from events.application.event.image import EventImageStorage
 from events.application.event.service import EventService
 from events.domain.models.event.event import Event
 from events.domain.models.event.repository import EventRepository
+from events.domain.models.event.slug import resolve_available_slug
 from events.domain.models.event.values import (
     Address,
     AgeRating,
@@ -26,6 +27,7 @@ class InMemoryEventRepository(EventRepository):
     def __init__(self) -> None:
         self.events: dict[EventID, Event] = {}
         self.outbox: list[PublishableEvent] = []
+        self.views_count: dict[EventID, int] = {}
 
     @override
     async def get(self, id: EventID) -> Event | None:
@@ -38,20 +40,50 @@ class InMemoryEventRepository(EventRepository):
         self.outbox.extend(event.pull_events())
 
     @override
+    async def find_available_slug(self, base_slug: str, exclude_event_id: EventID | None = None) -> str:
+        existing_slugs = {e.slug for e in self.events.values() if exclude_event_id is None or e.id != exclude_event_id}
+        return resolve_available_slug(base_slug, existing_slugs)
+
+    @override
     async def list_by_organization(
         self,
         organization_id: OrganizationID,
         *,
         status: EventStatus | None = None,
-        limit: int = 50,
+        limit: int = 10,
         offset: int = 0,
-    ) -> list[Event]:
+    ) -> tuple[list[Event], int]:
         events = [
             e
             for e in self.events.values()
             if e.organization_id == organization_id and (status is None or e.status == status)
         ]
-        return events[offset : offset + limit]
+        return events[offset : offset + limit], len(events)
+
+    @override
+    async def list_public(
+        self,
+        now: datetime,
+        *,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> tuple[list[Event], int]:
+        views_count = self.views_count
+        matching = [
+            e
+            for e in self.events.values()
+            if e.status in (EventStatus.PUBLISHED, EventStatus.POSTPONED)
+            and e.period is not None
+            and e.period.end_at >= now
+        ]
+        matching.sort(
+            key=lambda e: (
+                -views_count.get(e.id, 0),
+                e.period.start_at if e.period and e.period.start_at else datetime.max.replace(tzinfo=UTC),
+                e.id,
+            )
+        )
+        return matching[offset : offset + limit], len(matching)
 
     @override
     async def list_ended_but_not_finished(self, now: datetime, *, limit: int) -> list[Event]:

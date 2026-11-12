@@ -4,7 +4,7 @@ Value objects for service's Inputs and Outputs.
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from pydantic import AwareDatetime, BaseModel, Field
 
@@ -12,6 +12,7 @@ from events.domain.models.event.event import Event
 from events.domain.models.event.values import (
     Address,
     AgeRating,
+    EventID,
     EventPeriod,
     EventStatus,
     EventUpdate,
@@ -90,9 +91,10 @@ class CancelEventInput(BaseModel):
 
 
 class EventOutput(BaseModel):
-    id: uuid.UUID
+    id: EventID
     organization_id: uuid.UUID
     title: str
+    slug: str
     description: str
     age_rating: AgeRating
     status: EventStatus
@@ -109,6 +111,7 @@ class EventOutput(BaseModel):
             id=event.id,
             organization_id=event.organization_id,
             title=event.title,
+            slug=event.slug,
             description=event.description,
             age_rating=event.age_rating,
             status=event.status,
@@ -118,6 +121,26 @@ class EventOutput(BaseModel):
             created_at=event.created_at,
             updated_at=event.updated_at,
             banner_url=banner_url,
+        )
+
+
+class PublicEventListItemOutput(BaseModel):
+    title: str
+    slug: str
+    venue: VenueSchema | None
+    period: PeriodSchema | None
+    banner_url: str | None = None
+    age_rating: AgeRating
+
+    @classmethod
+    def from_domain(cls, event: Event, *, banner_url: str | None = None) -> Self:
+        return cls(
+            title=event.title,
+            slug=event.slug,
+            venue=_venue_to_schema(event.venue),
+            period=PeriodSchema(start_at=event.period.start_at, end_at=event.period.end_at) if event.period else None,
+            banner_url=banner_url,
+            age_rating=event.age_rating,
         )
 
 

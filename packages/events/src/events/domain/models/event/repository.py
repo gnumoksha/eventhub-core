@@ -7,10 +7,12 @@ from shared.infra.di import Depends
 from shared.infra.outbox import add_to_outbox
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
-from sqlmodel import col, select
+from sqlmodel import col, func, select
 
 from events.domain.models.event.event import Event
+from events.domain.models.event.slug import resolve_available_slug
 from events.domain.models.event.values import EventID, EventStatus, OrganizationID
+from events.domain.models.event_view.event_view import EventView
 
 
 class EventRepository:
@@ -43,21 +45,75 @@ class EventRepository:
             await self._session.rollback()
             raise ConcurrencyConflict(f"Event {event_id} was modified by someone else") from exc
 
+    async def find_available_slug(self, base_slug: str, exclude_event_id: EventID | None = None) -> str:
+        escaped_base = base_slug.replace("%", r"\%").replace("_", r"\_")
+        query = select(Event.slug).where(col(Event.slug).like(f"{escaped_base}%"))
+        if exclude_event_id is not None:
+            query = query.where(col(Event.id) != exclude_event_id)
+        result = await self._session.execute(query)
+        existing_slugs = set(result.scalars().all())
+
+        return resolve_available_slug(base_slug, existing_slugs)
+
     async def list_by_organization(
         self,
         organization_id: OrganizationID,
         *,
         status: EventStatus | None = None,
-        limit: int = 50,
+        limit: int = 10,
         offset: int = 0,
-    ) -> list[Event]:
-        query = select(Event).where(Event.organization_id == organization_id)
+    ) -> tuple[list[Event], int]:
+        filters = [Event.organization_id == organization_id]
         if status is not None:
-            query = query.where(Event.status == status)
-        query = query.order_by(col(Event.start_at).desc().nulls_first(), col(Event.id).desc())
+            filters.append(Event.status == status)
 
-        result = await self._session.execute(query.offset(offset).limit(limit))
-        return list(result.scalars().all())
+        count_query = select(func.count(col(Event.id))).where(*filters)
+        total_res = await self._session.execute(count_query)
+        total = total_res.scalar_one_or_none() or 0
+
+        query = (
+            select(Event)
+            .where(*filters)
+            .order_by(col(Event.start_at).desc().nulls_first(), col(Event.id).desc())
+            .offset(offset)
+            .limit(limit)
+        )
+
+        result = await self._session.execute(query)
+        return list(result.scalars().all()), total
+
+    async def list_public(
+        self,
+        now: datetime,
+        *,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> tuple[list[Event], int]:
+        filters = [
+            col(Event.status).in_([EventStatus.PUBLISHED, EventStatus.POSTPONED]),
+            col(Event.end_at) >= now,
+        ]
+
+        count_query = select(func.count(col(Event.id))).where(*filters)
+        total_res = await self._session.execute(count_query)
+        total = total_res.scalar_one_or_none() or 0
+
+        views_count = func.count(col(EventView.id)).label("views_count")
+        query = (
+            select(Event)
+            .outerjoin(EventView, col(Event.id) == col(EventView.event_id))
+            .where(*filters)
+            .group_by(col(Event.id))
+            .order_by(
+                views_count.desc(),
+                col(Event.start_at).asc().nulls_last(),
+                col(Event.id).asc(),
+            )
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await self._session.execute(query)
+        return list(result.scalars().all()), total
 
     async def list_ended_but_not_finished(self, now: datetime, *, limit: int) -> list[Event]:
         """Returns published or postponed events whose period already ended."""

@@ -41,6 +41,13 @@ class InMemoryOrganizationRepository(OrganizationRepository):
         return [org for org in self.organizations.values() if org.has_member(account_id)]
 
     @override
+    async def list_paginated_for_account(
+        self, account_id: uuid.UUID, *, limit: int = 10, offset: int = 0
+    ) -> tuple[list[Organization], int]:
+        matching = [org for org in self.organizations.values() if org.has_member(account_id)]
+        return matching[offset : offset + limit], len(matching)
+
+    @override
     async def list_pending_verification(self) -> list[Organization]:
         return [org for org in self.organizations.values() if org.verification_status == VerificationStatus.PENDING]
 

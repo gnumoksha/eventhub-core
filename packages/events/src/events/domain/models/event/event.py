@@ -19,6 +19,7 @@ from events.domain.models.event.events import (
     EventPublished,
     EventUpdated,
 )
+from events.domain.models.event.slug import SLUG_MAX_LENGTH, Slug
 from events.domain.models.event.values import (
     Address,
     AgeRating,
@@ -59,6 +60,7 @@ class Event(SQLModel, table=True):
     id: EventID = Field(default_factory=uuid_compat.uuid7, primary_key=True)
     organization_id: OrganizationID = Field(index=True)
     title: str = Field(max_length=TITLE_MAX_LENGTH)
+    slug: str = Field(max_length=SLUG_MAX_LENGTH, unique=True, index=True)
     description: str
     # inherit_schema: the PostgreSQL enum type is created in the schema of the table
     age_rating: AgeRating = Field(sa_type=Enum(AgeRating, inherit_schema=True))
@@ -95,14 +97,18 @@ class Event(SQLModel, table=True):
         description: str,
         age_rating: AgeRating,
         now: datetime,
+        slug: Slug | str | None = None,
         venue: Venue | None = None,
         period: EventPeriod | None = None,
     ) -> Self:
         """Creates a new event as a draft."""
         # table models skip the Pydantic validation, so the domain rules are checked explicitly
+        validated_title = _validate_title(title)
+        resolved_slug = Slug(slug) if isinstance(slug, str) else (slug or Slug.from_title(validated_title))
         event = cls(
             organization_id=organization_id,
-            title=_validate_title(title),
+            title=validated_title,
+            slug=str(resolved_slug),
             description=_validate_description(description),
             age_rating=age_rating,
             status=EventStatus.DRAFT,
@@ -123,7 +129,11 @@ class Event(SQLModel, table=True):
             return None
         return EventPeriod(start_at=self.start_at, end_at=self.end_at)
 
-    def update(self, event_update: EventUpdate, *, now: datetime) -> None:
+    def should_update_slug(self, new_title: str) -> bool:
+        """Checks if the title changed while the event is still in DRAFT."""
+        return self.status == EventStatus.DRAFT and new_title.strip() != self.title
+
+    def update(self, event_update: EventUpdate, *, now: datetime, new_slug: Slug | str | None = None) -> None:
         """Replaces the editable event details while preserving lifecycle rules."""
         if self.status not in _EDITABLE_STATUSES:
             raise InvalidStateTransition(f"A {self.status} event cannot be edited")
@@ -137,6 +147,13 @@ class Event(SQLModel, table=True):
             raise InvalidStateTransition("The venue can only be changed while the event is a draft")
         if self.status != EventStatus.DRAFT and period_changed:
             raise InvalidStateTransition("A published event can only be rescheduled by postponing it")
+
+        if self.status == EventStatus.DRAFT:
+            if new_slug is not None:
+                resolved_slug = Slug(new_slug) if isinstance(new_slug, str) else new_slug
+                self.slug = str(resolved_slug)
+            elif title != self.title:
+                self.slug = str(Slug.from_title(title))
 
         self.title = title
         self.description = description

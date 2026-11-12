@@ -16,11 +16,14 @@ from organizers.application.payout_account.service import (
     __get_service as __get_payout_account_service,
 )
 from organizers.infra.http.routers.setup import setup_routers
+from shared.domain.error_handler import domain_error_handler
+from shared.domain.errors import DomainError
 
 
 @pytest.fixture
 def client(service: OrganizationService, payout_account_service: PayoutAccountService):
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     setup_routers(app)
     active_account = {"id": uuid.uuid4()}
     app.dependency_overrides[__get_service] = lambda: service
@@ -139,3 +142,36 @@ def test_payout_account_response_masks_sensitive_values(client):
     assert response.json()["status"] == "PENDING"
     assert response.json()["pix_key"] == "*************.com"
     assert response.json()["holder_tax_id"] == "*******4725"
+
+
+def test_list_organizations_returns_paginated_wrapper(client):
+    test_client, _active_account = client
+    test_client.post(
+        "/organizations",
+        json={"public_name": "Org 1"},
+    )
+    response = test_client.get("/organizations?limit=10&offset=0")
+    assert response.status_code == 200
+    body = response.json()
+    assert "items" in body
+    assert "total" in body
+    assert body["limit"] == 10
+    assert body["offset"] == 0
+    assert body["total"] >= 1
+
+
+def test_list_members_returns_paginated_wrapper(client):
+    test_client, _active_account = client
+    created = test_client.post(
+        "/organizations",
+        json={"public_name": "Org With Members"},
+    ).json()
+    response = test_client.get(f"/organizations/{created['id']}/members?limit=5&offset=0")
+    assert response.status_code == 200
+    body = response.json()
+    assert "items" in body
+    assert "total" in body
+    assert body["limit"] == 5
+    assert body["offset"] == 0
+    assert body["total"] == 1
+    assert len(body["items"]) == 1
