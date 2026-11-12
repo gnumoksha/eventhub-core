@@ -212,6 +212,18 @@ async def test_find_available_slug(repository: EventRepository):
     own_slug = await repository.find_available_slug("festival", exclude_event_id=ev1.id)
     assert own_slug == "festival"
 
+    # Does not jump suffix if an existing slug ends in a number/year (e.g. concert-2026)
+    ev_year = make_draft()
+    ev_year.slug = "concert-2026"
+    await repository.save(ev_year)
+
+    ev_concert = make_draft()
+    ev_concert.slug = "concert"
+    await repository.save(ev_concert)
+
+    next_concert = await repository.find_available_slug("concert")
+    assert next_concert == "concert-2"
+
 
 async def test_list_public(repository: EventRepository, session: AsyncSession):
     # Event 1: published, starts in 20 days, has 2 views

@@ -7,7 +7,7 @@ from shared.infra.logger import logger
 from events.application.event.image import EventBannerUpload, EventImageServiceDep, EventImageStorage
 from events.domain.models.event.event import Event
 from events.domain.models.event.repository import EventRepository, EventRepositoryDep
-from events.domain.models.event.slug import slugify
+from events.domain.models.event.slug import Slug
 from events.domain.models.event.values import (
     AgeRating,
     EventID,
@@ -49,7 +49,7 @@ class EventService:
         period: EventPeriod | None = None,
         banner: EventBannerUpload | None = None,
     ) -> Event:
-        base_slug = slugify(title)[:100].strip("-") or "event"
+        base_slug = Slug.from_title(title).value
         slug = await self._repository.find_available_slug(base_slug)
         event = Event.create(
             organization_id=organization_id,
@@ -138,8 +138,8 @@ class EventService:
         event = await self.get(event_id)
 
         new_slug = None
-        if event.status == EventStatus.DRAFT and event_update.title != event.title:
-            base_slug = slugify(event_update.title)[:100].strip("-") or "event"
+        if event.should_update_slug(event_update.title):
+            base_slug = Slug.from_title(event_update.title).value
             new_slug = await self._repository.find_available_slug(base_slug, exclude_event_id=event.id)
 
         event.update(event_update, now=self._clock(), new_slug=new_slug)

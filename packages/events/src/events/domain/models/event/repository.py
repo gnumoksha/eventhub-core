@@ -1,4 +1,3 @@
-import re
 from datetime import datetime
 from typing import Annotated
 
@@ -11,6 +10,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from sqlmodel import col, func, select
 
 from events.domain.models.event.event import Event
+from events.domain.models.event.slug import resolve_available_slug
 from events.domain.models.event.values import EventID, EventStatus, OrganizationID
 from events.domain.models.event_view.event_view import EventView
 
@@ -53,17 +53,7 @@ class EventRepository:
         result = await self._session.execute(query)
         existing_slugs = set(result.scalars().all())
 
-        if base_slug not in existing_slugs:
-            return base_slug
-
-        pattern = re.compile(rf"^{re.escape(base_slug)}-(\d+)$")
-        highest = 1
-        for s in existing_slugs:
-            match = pattern.match(s)
-            if match:
-                highest = max(highest, int(match.group(1)))
-
-        return f"{base_slug}-{highest + 1}"
+        return resolve_available_slug(base_slug, existing_slugs)
 
     async def list_by_organization(
         self,

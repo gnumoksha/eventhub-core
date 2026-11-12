@@ -19,7 +19,7 @@ from events.domain.models.event.events import (
     EventPublished,
     EventUpdated,
 )
-from events.domain.models.event.slug import SLUG_MAX_LENGTH, slugify
+from events.domain.models.event.slug import SLUG_MAX_LENGTH, Slug
 from events.domain.models.event.values import (
     Address,
     AgeRating,
@@ -97,18 +97,18 @@ class Event(SQLModel, table=True):
         description: str,
         age_rating: AgeRating,
         now: datetime,
-        slug: str | None = None,
+        slug: Slug | str | None = None,
         venue: Venue | None = None,
         period: EventPeriod | None = None,
     ) -> Self:
         """Creates a new event as a draft."""
         # table models skip the Pydantic validation, so the domain rules are checked explicitly
         validated_title = _validate_title(title)
-        resolved_slug = slug if slug is not None else (slugify(validated_title) or "event")
+        resolved_slug = Slug(slug) if isinstance(slug, str) else (slug or Slug.from_title(validated_title))
         event = cls(
             organization_id=organization_id,
             title=validated_title,
-            slug=_validate_slug(resolved_slug),
+            slug=str(resolved_slug),
             description=_validate_description(description),
             age_rating=age_rating,
             status=EventStatus.DRAFT,
@@ -129,7 +129,11 @@ class Event(SQLModel, table=True):
             return None
         return EventPeriod(start_at=self.start_at, end_at=self.end_at)
 
-    def update(self, event_update: EventUpdate, *, now: datetime, new_slug: str | None = None) -> None:
+    def should_update_slug(self, new_title: str) -> bool:
+        """Checks if the title changed while the event is still in DRAFT."""
+        return self.status == EventStatus.DRAFT and new_title.strip() != self.title
+
+    def update(self, event_update: EventUpdate, *, now: datetime, new_slug: Slug | str | None = None) -> None:
         """Replaces the editable event details while preserving lifecycle rules."""
         if self.status not in _EDITABLE_STATUSES:
             raise InvalidStateTransition(f"A {self.status} event cannot be edited")
@@ -144,9 +148,14 @@ class Event(SQLModel, table=True):
         if self.status != EventStatus.DRAFT and period_changed:
             raise InvalidStateTransition("A published event can only be rescheduled by postponing it")
 
+        if self.status == EventStatus.DRAFT:
+            if new_slug is not None:
+                resolved_slug = Slug(new_slug) if isinstance(new_slug, str) else new_slug
+                self.slug = str(resolved_slug)
+            elif title != self.title:
+                self.slug = str(Slug.from_title(title))
+
         self.title = title
-        if self.status == EventStatus.DRAFT and new_slug is not None:
-            self.slug = _validate_slug(new_slug)
         self.description = description
         self.age_rating = event_update.age_rating
         self._set_venue(event_update.venue)
@@ -293,15 +302,6 @@ def _validate_title(title: str) -> str:
     if len(title) > TITLE_MAX_LENGTH:
         raise InvalidValue(f"The title must have at most {TITLE_MAX_LENGTH} characters")
     return title
-
-
-def _validate_slug(slug: str) -> str:
-    cleaned = slug.strip()
-    if not cleaned:
-        raise InvalidValue("The slug is required")
-    if len(cleaned) > SLUG_MAX_LENGTH:
-        raise InvalidValue(f"The slug must have at most {SLUG_MAX_LENGTH} characters")
-    return cleaned
 
 
 def _validate_description(description: str) -> str:

@@ -1,4 +1,3 @@
-import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import BinaryIO, override
@@ -8,6 +7,7 @@ from events.application.event.image import EventImageStorage
 from events.application.event.service import EventService
 from events.domain.models.event.event import Event
 from events.domain.models.event.repository import EventRepository
+from events.domain.models.event.slug import resolve_available_slug
 from events.domain.models.event.values import (
     Address,
     AgeRating,
@@ -42,17 +42,7 @@ class InMemoryEventRepository(EventRepository):
     @override
     async def find_available_slug(self, base_slug: str, exclude_event_id: EventID | None = None) -> str:
         existing_slugs = {e.slug for e in self.events.values() if exclude_event_id is None or e.id != exclude_event_id}
-        if base_slug not in existing_slugs:
-            return base_slug
-
-        pattern = re.compile(rf"^{re.escape(base_slug)}-(\d+)$")
-        highest = 1
-        for s in existing_slugs:
-            match = pattern.match(s)
-            if match:
-                highest = max(highest, int(match.group(1)))
-
-        return f"{base_slug}-{highest + 1}"
+        return resolve_available_slug(base_slug, existing_slugs)
 
     @override
     async def list_by_organization(

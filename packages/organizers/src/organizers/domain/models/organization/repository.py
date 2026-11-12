@@ -40,7 +40,18 @@ class OrganizationRepository:
         result = await self._session.execute(query)
         return result.scalars().first()
 
-    async def list_for_account(
+    async def list_for_account(self, account_id: AccountID) -> list[Organization]:
+        query = (
+            select(Organization)
+            .join(Member, col(Organization.id) == col(Member.organization_id))
+            .where(col(Member.account_id) == account_id)
+            .options(selectinload(Organization.members))  # ty:ignore[invalid-argument-type]
+            .order_by(col(Organization.created_at), col(Organization.id))
+        )
+        result = await self._session.execute(query)
+        return list(result.scalars().unique().all())
+
+    async def list_paginated_for_account(
         self, account_id: AccountID, *, limit: int = 10, offset: int = 0
     ) -> tuple[list[Organization], int]:
         count_query = (

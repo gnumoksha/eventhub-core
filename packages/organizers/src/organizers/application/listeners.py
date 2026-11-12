@@ -22,7 +22,7 @@ async def remove_deactivated_account_memberships(
 
 
 async def remove_deactivated_memberships(account_id: UUID, repository: OrganizationRepository) -> None:
-    organizations, _ = await repository.list_for_account(account_id, limit=1000)
+    organizations = await repository.list_for_account(account_id)
     for organization in organizations:
         member = next((member for member in organization.members if member.account_id == account_id), None)
         if member is not None and member.role != MemberRole.OWNER:

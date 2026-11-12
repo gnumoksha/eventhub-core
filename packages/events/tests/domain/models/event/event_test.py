@@ -129,6 +129,39 @@ class TestEditing:
         assert deserialized.title == updated.title
         assert deserialized.to_dict() == updated.to_dict()
 
+    def test_draft_update_updates_slug_when_title_changes(self):
+        event = make_draft()
+        assert event.slug == "rock-in-rio"
+        event.update(
+            EventUpdate(
+                title="Monsters of Rock",
+                description=event.description,
+                age_rating=event.age_rating,
+                venue=event.venue,
+                period=event.period,
+            ),
+            now=NOW,
+        )
+        assert event.title == "Monsters of Rock"
+        assert event.slug == "monsters-of-rock"
+
+    def test_published_update_keeps_slug_even_when_title_changes(self):
+        event = make_draft()
+        event.publish(NOW)
+        assert event.slug == "rock-in-rio"
+        event.update(
+            EventUpdate(
+                title="Rock in Rio Special Edition",
+                description=event.description,
+                age_rating=event.age_rating,
+                venue=event.venue,
+                period=event.period,
+            ),
+            now=NOW,
+        )
+        assert event.title == "Rock in Rio Special Edition"
+        assert event.slug == "rock-in-rio"
+
     def test_cancelled_event_cannot_be_edited(self):
         event = make_draft()
         event.cancel("Not happening", NOW)

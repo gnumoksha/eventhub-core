@@ -36,10 +36,13 @@ class OrganizationService:
         await self._repository.save(organization)
         return organization
 
-    async def list_for_account(
+    async def list_for_account(self, account_id: AccountID) -> list[Organization]:
+        return await self._repository.list_for_account(account_id)
+
+    async def list_paginated_for_account(
         self, account_id: AccountID, *, limit: int = 10, offset: int = 0
     ) -> tuple[list[Organization], int]:
-        return await self._repository.list_for_account(account_id, limit=limit, offset=offset)
+        return await self._repository.list_paginated_for_account(account_id, limit=limit, offset=offset)
 
     async def get(self, organization_id: OrganizationID, account_id: AccountID) -> Organization:
         organization = await self._repository.get_for_member(organization_id, account_id)

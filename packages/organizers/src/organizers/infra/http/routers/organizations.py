@@ -130,7 +130,7 @@ async def list_organizations(
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PaginatedOutput[OrganizationOutput]:
-    organizations, total = await service.list_for_account(
+    organizations, total = await service.list_paginated_for_account(
         session.account_id, limit=limit, offset=offset
     )
     return PaginatedOutput(
