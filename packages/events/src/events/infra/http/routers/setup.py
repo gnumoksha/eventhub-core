@@ -2,12 +2,16 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from events.application.event.service import EventNotFound
+from events.infra.http.routers.events import (
+    router as public_events_router,
+)
 from events.infra.http.routers.organizers.events import (
     router as organizers_events_router,
 )
 
 
 def setup_routers(app: FastAPI) -> None:
+    app.include_router(public_events_router)
     app.include_router(organizers_events_router)
 
     app.add_exception_handler(EventNotFound, _event_not_found_handler)

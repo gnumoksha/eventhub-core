@@ -7,7 +7,7 @@ from shared.infra.outbox import add_to_outbox
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import StaleDataError
-from sqlmodel import col, select
+from sqlmodel import col, func, select
 
 from organizers.domain.models.organization.organization import Member, Organization
 from organizers.domain.models.organization.values import (
@@ -40,16 +40,28 @@ class OrganizationRepository:
         result = await self._session.execute(query)
         return result.scalars().first()
 
-    async def list_for_account(self, account_id: AccountID) -> list[Organization]:
+    async def list_for_account(
+        self, account_id: AccountID, *, limit: int = 10, offset: int = 0
+    ) -> tuple[list[Organization], int]:
+        count_query = (
+            select(func.count(func.distinct(col(Organization.id))))
+            .join(Member, col(Organization.id) == col(Member.organization_id))
+            .where(col(Member.account_id) == account_id)
+        )
+        total_res = await self._session.execute(count_query)
+        total = total_res.scalar_one_or_none() or 0
+
         query = (
             select(Organization)
             .join(Member, col(Organization.id) == col(Member.organization_id))
             .where(col(Member.account_id) == account_id)
             .options(selectinload(Organization.members))  # ty:ignore[invalid-argument-type]
             .order_by(col(Organization.created_at), col(Organization.id))
+            .offset(offset)
+            .limit(limit)
         )
         result = await self._session.execute(query)
-        return list(result.scalars().unique().all())
+        return list(result.scalars().unique().all()), total
 
     async def list_pending_verification(self) -> list[Organization]:
         query = (

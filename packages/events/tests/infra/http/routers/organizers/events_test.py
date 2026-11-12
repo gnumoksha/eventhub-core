@@ -94,12 +94,14 @@ def create_event(client: TestClient) -> dict:
 
 def test_create_and_get_event(client: TestClient):
     created = create_event(client)
+    assert created["slug"] == "festival"
 
     response = client.get(f"/organizers/events/{created['id']}")
 
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "DRAFT"
+    assert body["slug"] == "festival"
     assert body["venue"]["address"]["postal_code"] == "05001200"
 
 
@@ -131,7 +133,9 @@ def test_list_organization_events(client: TestClient):
     response = client.get("/organizers/events", params={"status": "PUBLISHED"})
 
     assert response.status_code == 200
-    assert [e["id"] for e in response.json()] == [first["id"]]
+    body = response.json()
+    assert body["total"] == 1
+    assert [e["id"] for e in body["items"]] == [first["id"]]
 
 
 def test_change_venue_to_online(client: TestClient):

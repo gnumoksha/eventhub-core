@@ -19,6 +19,7 @@ from events.domain.models.event.events import (
     EventPublished,
     EventUpdated,
 )
+from events.domain.models.event.slug import SLUG_MAX_LENGTH, slugify
 from events.domain.models.event.values import (
     Address,
     AgeRating,
@@ -59,6 +60,7 @@ class Event(SQLModel, table=True):
     id: EventID = Field(default_factory=uuid_compat.uuid7, primary_key=True)
     organization_id: OrganizationID = Field(index=True)
     title: str = Field(max_length=TITLE_MAX_LENGTH)
+    slug: str = Field(max_length=SLUG_MAX_LENGTH, unique=True, index=True)
     description: str
     # inherit_schema: the PostgreSQL enum type is created in the schema of the table
     age_rating: AgeRating = Field(sa_type=Enum(AgeRating, inherit_schema=True))
@@ -95,14 +97,18 @@ class Event(SQLModel, table=True):
         description: str,
         age_rating: AgeRating,
         now: datetime,
+        slug: str | None = None,
         venue: Venue | None = None,
         period: EventPeriod | None = None,
     ) -> Self:
         """Creates a new event as a draft."""
         # table models skip the Pydantic validation, so the domain rules are checked explicitly
+        validated_title = _validate_title(title)
+        resolved_slug = slug if slug is not None else (slugify(validated_title) or "event")
         event = cls(
             organization_id=organization_id,
-            title=_validate_title(title),
+            title=validated_title,
+            slug=_validate_slug(resolved_slug),
             description=_validate_description(description),
             age_rating=age_rating,
             status=EventStatus.DRAFT,
@@ -123,7 +129,7 @@ class Event(SQLModel, table=True):
             return None
         return EventPeriod(start_at=self.start_at, end_at=self.end_at)
 
-    def update(self, event_update: EventUpdate, *, now: datetime) -> None:
+    def update(self, event_update: EventUpdate, *, now: datetime, new_slug: str | None = None) -> None:
         """Replaces the editable event details while preserving lifecycle rules."""
         if self.status not in _EDITABLE_STATUSES:
             raise InvalidStateTransition(f"A {self.status} event cannot be edited")
@@ -139,6 +145,8 @@ class Event(SQLModel, table=True):
             raise InvalidStateTransition("A published event can only be rescheduled by postponing it")
 
         self.title = title
+        if self.status == EventStatus.DRAFT and new_slug is not None:
+            self.slug = _validate_slug(new_slug)
         self.description = description
         self.age_rating = event_update.age_rating
         self._set_venue(event_update.venue)
@@ -285,6 +293,15 @@ def _validate_title(title: str) -> str:
     if len(title) > TITLE_MAX_LENGTH:
         raise InvalidValue(f"The title must have at most {TITLE_MAX_LENGTH} characters")
     return title
+
+
+def _validate_slug(slug: str) -> str:
+    cleaned = slug.strip()
+    if not cleaned:
+        raise InvalidValue("The slug is required")
+    if len(cleaned) > SLUG_MAX_LENGTH:
+        raise InvalidValue(f"The slug must have at most {SLUG_MAX_LENGTH} characters")
+    return cleaned
 
 
 def _validate_description(description: str) -> str:

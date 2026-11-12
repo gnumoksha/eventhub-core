@@ -37,8 +37,11 @@ class InMemoryOrganizationRepository(OrganizationRepository):
         return org if org and org.has_member(account_id) else None
 
     @override
-    async def list_for_account(self, account_id: uuid.UUID) -> list[Organization]:
-        return [org for org in self.organizations.values() if org.has_member(account_id)]
+    async def list_for_account(
+        self, account_id: uuid.UUID, *, limit: int = 10, offset: int = 0
+    ) -> tuple[list[Organization], int]:
+        matching = [org for org in self.organizations.values() if org.has_member(account_id)]
+        return matching[offset : offset + limit], len(matching)
 
     @override
     async def list_pending_verification(self) -> list[Organization]:

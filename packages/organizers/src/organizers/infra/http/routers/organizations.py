@@ -1,9 +1,10 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Response, status
+from fastapi import APIRouter, Body, Query, Response, status
 from identity.infra.http.authentication import CommonSessionDep, CSRFDep
 from pydantic import BaseModel
+from shared.infra.http.pagination import PaginatedOutput
 
 from organizers.application.organization.service import (
     OrganizationServiceDep,
@@ -124,12 +125,20 @@ async def create_organization(
 
 @router.get("")
 async def list_organizations(
-    service: OrganizationServiceDep, session: CommonSessionDep
-) -> list[OrganizationOutput]:
-    return [
-        _organization_output(org, session.account_id)
-        for org in await service.list_for_account(session.account_id)
-    ]
+    service: OrganizationServiceDep,
+    session: CommonSessionDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> PaginatedOutput[OrganizationOutput]:
+    organizations, total = await service.list_for_account(
+        session.account_id, limit=limit, offset=offset
+    )
+    return PaginatedOutput(
+        items=[_organization_output(org, session.account_id) for org in organizations],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/{organization_id}")
@@ -166,12 +175,22 @@ async def list_members(
     organization_id: UUID,
     service: OrganizationServiceDep,
     session: CommonSessionDep,
-) -> list[MemberOutput]:
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> PaginatedOutput[MemberOutput]:
     organization = await _get_organization(service, organization_id, session.account_id)
-    return [
+    all_members = [
         MemberOutput(account_id=member.account_id, role=member.role)
         for member in organization.members
     ]
+    total = len(all_members)
+    items = all_members[offset : offset + limit]
+    return PaginatedOutput(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post("/{organization_id}/members", status_code=status.HTTP_201_CREATED)

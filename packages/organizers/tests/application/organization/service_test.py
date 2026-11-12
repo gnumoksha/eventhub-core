@@ -32,7 +32,9 @@ async def test_deactivated_non_owner_membership_is_removed(service, create_organ
     await repository.save(organization)
 
     await remove_deactivated_memberships(staff_account_id, repository)
-    assert await service.list_for_account(staff_account_id) == []
+    orgs, total = await service.list_for_account(staff_account_id)
+    assert orgs == []
+    assert total == 0
 
 
 @pytest.mark.asyncio

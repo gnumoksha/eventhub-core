@@ -15,6 +15,7 @@ from fastapi import (
 )
 from identity.infra.http.authentication import CommonSessionDep, CSRFDep
 from pydantic import ValidationError
+from shared.infra.http.pagination import PaginatedOutput
 
 from events.application.event.image import (
     EventBannerUpload,
@@ -113,13 +114,18 @@ async def list_organization_events(
     image_service: EventImageServiceDep,
     session: CommonSessionDep,
     status_: Annotated[EventStatus | None, Query(alias="status")] = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
     offset: Annotated[int, Query(ge=0)] = 0,
-) -> list[EventOutput]:
-    events = await service.list_by_organization(
+) -> PaginatedOutput[EventOutput]:
+    events, total = await service.list_by_organization(
         session.organization_id, status=status_, limit=limit, offset=offset
     )
-    return [_output(event, image_service) for event in events]
+    return PaginatedOutput(
+        items=[_output(event, image_service) for event in events],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/{event_id}")
