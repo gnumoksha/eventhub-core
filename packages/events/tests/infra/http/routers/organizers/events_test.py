@@ -210,26 +210,10 @@ def test_reject_banner_with_mismatched_signature(client: TestClient):
     assert response.status_code == 415
 
 
-def test_record_view_returns_204(client: TestClient, mock_view_service: AsyncMock):
+def test_post_views_on_organizers_router_is_not_allowed(client: TestClient):
     event_id = uuid.uuid4()
-    mock_view_service.record_view.return_value = True
-
-    response = client.post(
-        f"/organizers/events/{event_id}/views",
-        headers={"User-Agent": "TestBrowser", "X-Session-ID": "sess-xyz"},
-    )
-
-    assert response.status_code == 204
-    mock_view_service.record_view.assert_called_once()
-    kwargs = mock_view_service.record_view.call_args[1]
-    assert kwargs["event_id"] == event_id
-    assert kwargs["user_agent"] == "TestBrowser"
-    assert kwargs["session_token"] == "sess-xyz"
-
-
-def test_record_view_with_invalid_uuid_returns_422(client: TestClient):
-    response = client.post("/organizers/events/not-a-valid-uuid/views")
-    assert response.status_code == 422
+    response = client.post(f"/organizers/events/{event_id}/views")
+    assert response.status_code == 405
 
 
 def test_get_views_authorized_returns_200(

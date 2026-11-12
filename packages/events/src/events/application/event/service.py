@@ -107,6 +107,12 @@ class EventService:
             raise EventNotFound(event_id)
         return event
 
+    async def get_public(self, event_id: EventID) -> Event:
+        event = await self.get(event_id)
+        if event.status == EventStatus.DRAFT:
+            raise EventNotFound(event_id)
+        return event
+
     async def list_by_organization(
         self,
         organization_id: OrganizationID,
