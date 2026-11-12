@@ -1,7 +1,18 @@
+import uuid
 from io import BytesIO
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from identity.infra.http.authentication import CommonSessionDep, CSRFDep
 from pydantic import ValidationError
 
@@ -18,10 +29,14 @@ from events.application.event.values import (
     PeriodSchema,
     UpdateEventInput,
 )
+from events.application.event_view.service import (
+    EventViewServiceDep,
+)
 from events.domain.models.event.event import Event
 from events.domain.models.event.values import EventID, EventStatus
+from events.domain.models.event_view.values import EventViewsMetrics
 
-router = APIRouter(prefix="/events", tags=["events"])
+router = APIRouter(prefix="/organizers/events", tags=["organizers", "events"])
 # TODO authorize that the authenticated account belongs to the event's organization.
 
 MAX_BANNER_SIZE = 5 * 1024 * 1024
@@ -174,3 +189,41 @@ async def replace_event_banner(
     upload = await _read_banner(banner)
     event = await service.update_banner(event_id, upload)
     return _output(event, image_service)
+
+
+@router.post("/{event_id}/views", status_code=status.HTTP_204_NO_CONTENT)
+async def record_event_view(
+    event_id: uuid.UUID,
+    request: Request,
+    service: EventViewServiceDep,
+    session_token: Annotated[str | None, Header(alias="X-Session-ID")] = None,
+) -> None:
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    await service.record_view(
+        event_id=event_id,
+        client_ip=client_ip,
+        user_agent=user_agent,
+        session_token=session_token,
+    )
+
+
+@router.get(
+    "/{event_id}/views",
+    response_model=EventViewsMetrics,
+    status_code=status.HTTP_200_OK,
+)
+async def get_event_views(
+    event_id: uuid.UUID,
+    session: CommonSessionDep,
+    event_service: EventServiceDep,
+    view_service: EventViewServiceDep,
+    days: Annotated[int, Query(ge=1, le=365)] = 30,
+) -> EventViewsMetrics:
+    event = await event_service.get(event_id)
+    if event.organization_id != session.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to view metrics for this event",
+        )
+    return await view_service.get_event_metrics(event_id, days=days)
