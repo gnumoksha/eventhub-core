@@ -22,6 +22,8 @@ from organizers.infra.http.routers.setup import setup_routers as organizers_setu
 from payments.infra.http.routers.setup import setup_routers as payments_setup_routers
 from reporting.infra.http.routers.setup import setup_routers as reporting_setup_routers
 from sales.infra.http.routers.setup import setup_routers as sales_setup_routers
+from shared.domain.error_handler import domain_error_handler
+from shared.domain.errors import DomainError
 from shared.infra.app_status.inputs import Mode, ShowAppStatusInput
 from shared.infra.app_status.outputs import ShowAppStatusOutput
 from shared.infra.app_status.services import AppStatusServiceDep
@@ -105,6 +107,9 @@ async def http_exception_handler(_request: Request, exc: Exception):
             "detail": "Internal server error",
         },
     )
+
+
+app.add_exception_handler(DomainError, domain_error_handler)
 
 
 @app.get("/app-status", dependencies=[Depends(require_private_ip_address)])
