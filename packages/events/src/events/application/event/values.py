@@ -116,7 +116,7 @@ class EventOutput(BaseModel):
             age_rating=event.age_rating,
             status=event.status,
             venue=_venue_to_schema(event.venue),
-            period=PeriodSchema(start_at=event.period.start_at, end_at=event.period.end_at) if event.period else None,
+            period=_period_to_schema(event.period),
             cancellation_reason=event.cancellation_reason,
             created_at=event.created_at,
             updated_at=event.updated_at,
@@ -125,6 +125,7 @@ class EventOutput(BaseModel):
 
 
 class PublicEventListItemOutput(BaseModel):
+    id: EventID
     title: str
     slug: str
     venue: VenueSchema | None
@@ -135,13 +136,48 @@ class PublicEventListItemOutput(BaseModel):
     @classmethod
     def from_domain(cls, event: Event, *, banner_url: str | None = None) -> Self:
         return cls(
+            id=event.id,
             title=event.title,
             slug=event.slug,
             venue=_venue_to_schema(event.venue),
-            period=PeriodSchema(start_at=event.period.start_at, end_at=event.period.end_at) if event.period else None,
+            period=_period_to_schema(event.period),
             banner_url=banner_url,
             age_rating=event.age_rating,
         )
+
+
+class PublicEventDetailsOutput(BaseModel):
+    id: EventID
+    title: str
+    slug: str
+    description: str
+    age_rating: AgeRating
+    status: EventStatus
+    venue: VenueSchema | None
+    period: PeriodSchema | None
+    banner_url: str | None = None
+    cancellation_reason: str | None = None
+
+    @classmethod
+    def from_domain(cls, event: Event, *, banner_url: str | None = None) -> Self:
+        return cls(
+            id=event.id,
+            title=event.title,
+            slug=event.slug,
+            description=event.description,
+            age_rating=event.age_rating,
+            status=event.status,
+            venue=_venue_to_schema(event.venue),
+            period=_period_to_schema(event.period),
+            banner_url=banner_url,
+            cancellation_reason=event.cancellation_reason,
+        )
+
+
+def _period_to_schema(period: EventPeriod | None) -> PeriodSchema | None:
+    if period is None:
+        return None
+    return PeriodSchema(start_at=period.start_at, end_at=period.end_at)
 
 
 def _venue_to_schema(venue: Venue | None) -> PhysicalVenueSchema | OnlineVenueSchema | None:
