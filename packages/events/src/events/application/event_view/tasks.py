@@ -67,7 +67,7 @@ def _build_views(records: list[dict[str, str]], valid_ids: set[EventID]) -> list
     return views
 
 
-@injectable
+@injectable(use_cache=False)
 async def _async_flush(
     redis: AsyncRedisDatabaseDep,
     event_repo: EventRepositoryDep,
