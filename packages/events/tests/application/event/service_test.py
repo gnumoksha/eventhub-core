@@ -45,6 +45,25 @@ async def test_unknown_event_raises_not_found(service: EventService):
         await service.publish(uuid.uuid4())
 
 
+async def test_get_public_returns_published_event(service: EventService):
+    event = await create_draft(service)
+    await service.publish(event.id)
+
+    public_event = await service.get_public(event.id)
+    assert public_event.id == event.id
+
+
+async def test_get_public_draft_raises_not_found(service: EventService):
+    draft = await create_draft(service)
+    with pytest.raises(EventNotFound):
+        await service.get_public(draft.id)
+
+
+async def test_get_public_unknown_event_raises_not_found(service: EventService):
+    with pytest.raises(EventNotFound):
+        await service.get_public(uuid.uuid4())
+
+
 async def test_list_by_organization_filters_by_status(service: EventService):
     organization_id = uuid.uuid4()
     draft = await create_draft(service, organization_id)

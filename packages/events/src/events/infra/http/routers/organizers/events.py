@@ -6,10 +6,8 @@ from fastapi import (
     APIRouter,
     File,
     Form,
-    Header,
     HTTPException,
     Query,
-    Request,
     UploadFile,
     status,
 )
@@ -195,23 +193,6 @@ async def replace_event_banner(
     upload = await _read_banner(banner)
     event = await service.update_banner(event_id, upload)
     return _output(event, image_service)
-
-
-@router.post("/{event_id}/views", status_code=status.HTTP_204_NO_CONTENT)
-async def record_event_view(
-    event_id: uuid.UUID,
-    request: Request,
-    service: EventViewServiceDep,
-    session_token: Annotated[str | None, Header(alias="X-Session-ID")] = None,
-) -> None:
-    client_ip = request.client.host if request.client else None
-    user_agent = request.headers.get("user-agent")
-    await service.record_view(
-        event_id=event_id,
-        client_ip=client_ip,
-        user_agent=user_agent,
-        session_token=session_token,
-    )
 
 
 @router.get(
